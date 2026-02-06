@@ -24,7 +24,7 @@ print("⏳ Starting AI Server...")
 # 1. LOAD AI MODELS (Created by train_model.py)
 try:
     model = joblib.load("discount_model2.pkl")
-    product_encoder = joblib.load("product_encoder.pkl") # Load the dynamic encoder
+    # product_encoder = joblib.load("discount_model2.pkl") # Load the dynamic encoder
     print("✅ AI Model & Encoder loaded successfully.")
 except FileNotFoundError:
     print("❌ Critical Error: 'discount_model2.pkl' or 'product_encoder.pkl' not found.")
