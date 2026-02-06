@@ -6,6 +6,7 @@ from flask_cors import CORS
 from pymongo import MongoClient
 from prophet import Prophet 
 from datetime import datetime, timedelta
+import os
 
 app = Flask(__name__)
 CORS(app)
@@ -13,24 +14,23 @@ CORS(app)
 # ==========================================
 # 0. CONFIGURATION & RESOURCES
 # ==========================================
-import os
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/")
 DB_NAME = "Food_Inventory"
-INVENTORY_COLLECTION = "products"      
+INVENTORY_COLLECTION = "products"       
 SALES_COLLECTION = "SalesHistory"     
 
 print("⏳ Starting AI Server...")
 
-# 1. LOAD AI MODELS (Created by train_model.py)
+# 1. LOAD AI MODELS
+# We attempt to load the model, but if it's missing, we log it and continue.
+# The current logic uses 'calculate_strategy' (rules), so the ML model is optional for now.
 try:
     model = joblib.load("discount_model2.pkl")
-    # product_encoder = joblib.load("discount_model2.pkl") # Load the dynamic encoder
-    print("✅ AI Model & Encoder loaded successfully.")
+    print("✅ AI Model loaded successfully.")
 except FileNotFoundError:
-    print("❌ Critical Error: 'discount_model2.pkl' or 'product_encoder.pkl' not found.")
-    print("   Run 'train_model.py' first to generate these files.")
+    print("⚠️ Warning: 'discount_model2.pkl' not found.")
+    print("   The server will run using Rule-Based Logic only.")
     model = None
-    product_encoder = None
 
 # ==========================================
 # 1. LOGIC ENGINE: DYNAMIC DISCOUNT STRATEGY
@@ -41,12 +41,16 @@ def calculate_strategy(row):
     based on remaining life, turnover rate, and stock pressure.
     """
     days_left = row['remaining_life']
-    turnover = row.get('inventory_turnover_rate', 0.5) # Default to 0.5 if missing
+    # Default turnover to 0.5 if missing
+    turnover = row.get('inventory_turnover_rate', 0.5) 
     stock = row['current_stock']
     
     # Stock Pressure: Ratio of stock to sales velocity (avoid div by zero)
     # Higher number = We have too much stock for how slow it sells
-    stock_pressure = stock / (row.get('sales_volume', 10) + 1)
+    sales_vol = row.get('sales_volume', 10)
+    if pd.isna(sales_vol): sales_vol = 10
+    
+    stock_pressure = stock / (sales_vol + 1)
 
     # --- TIER 1: CRITICAL (DONATION / LOSS) ---
     if days_left <= 0:
@@ -80,9 +84,6 @@ def calculate_strategy(row):
 # ==========================================
 # 2. API ROUTE: DISCOUNT OPTIMIZATION
 # ==========================================
-# ==========================================
-# 2. API ROUTE: DISCOUNT OPTIMIZATION
-# ==========================================
 @app.route('/api/discounts', methods=['GET'])
 def get_discounts():
     try:
@@ -102,30 +103,18 @@ def get_discounts():
             if col in df.columns:
                 df[col] = pd.to_datetime(df[col])
 
-        # --- FIX STARTS HERE -----------------------------------------
-        # SET THIS DATE TO SIMULATE TIME TRAVEL
-        # Example: If today is Jan 2026, but you want to test as if it's Jan 2025:
-        # SIMULATION_DATE = datetime(2025, 1, 15) 
-        
-        # For now, we use the System Date, BUT you can uncomment the line below to test:
+        # --- DATE CALCULATION ---
+        # Using system time for calculation
         current_date_ref = datetime.now() 
-        # current_date_ref = datetime(2024, 8, 10) # <--- UNCOMMENT THIS TO FORCE A SPECIFIC DATE
+        # current_date_ref = datetime(2024, 8, 10) # Uncomment to simulate a specific date
 
         print(f"DEBUG: Calculating Expiry based on reference date: {current_date_ref}")
 
         df['remaining_life'] = (df['expiry_date'] - current_date_ref).dt.days
-        # -------------------------------------------------------------
         
-        # Safe Encoding
-        if product_encoder:
-            known_classes = set(product_encoder.classes_)
-            df['product_name_encoded'] = df['product_name'].apply(
-                lambda x: product_encoder.transform([x])[0] if x in known_classes else -1
-            )
-        else:
-            df['product_name_encoded'] = 0
-
         # 3. APPLY LOGIC STRATEGY
+        # We use the rule-based function defined above. 
+        # This does NOT require the product_encoder.
         df[['action_status', 'final_discount_pct']] = df.apply(
             lambda row: pd.Series(calculate_strategy(row)), axis=1
         )
@@ -182,13 +171,16 @@ def get_forecast():
         results = []
         unique_products = df['product_name'].unique()
         
-        # Optimization: Limit to top 10 products if list is huge to prevent timeout
-        # In production, use pagination or background workers
+        # Optimization: Limit to top 10 products to prevent timeout
         unique_products = unique_products[:10] 
 
         for product in unique_products:
             # Prepare Data for Prophet
             p_df = df[df['product_name'] == product].copy()
+            # Ensure date column exists and is datetime
+            if 'date' not in p_df.columns:
+                 continue
+                 
             p_df['ds'] = pd.to_datetime(p_df['date'])
             p_df['y'] = p_df['quantity_sold']
             
@@ -210,9 +202,7 @@ def get_forecast():
             # Safety Stock Logic (5% buffer)
             recommended_order = int(predicted_demand * 1.05)
             
-            # Waste Calculation:
-            # Compare AI prediction vs "Naive" Average (Last 30 days)
-            # If AI predicts 50, but Average was 80, we saved you buying 30 extra units.
+            # Waste Calculation
             avg_demand = p_df.tail(30)['y'].mean() * 7 if len(p_df) > 30 else p_df['y'].mean() * 7
             waste_saved = max(0, int(avg_demand - recommended_order))
             
@@ -230,4 +220,6 @@ def get_forecast():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # Use the PORT environment variable if available (Render sets this)
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host='0.0.0.0', port=port, debug=True)
