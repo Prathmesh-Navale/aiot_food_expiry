@@ -11,8 +11,10 @@ import joblib
 # ==========================================
 print("⏳ Connecting to MongoDB...")
 
-# Connection Details (Update if your DB name is different)
-MONGO_URI = "mongodb://localhost:27017/"
+import os
+
+# Get the cloud URI from Render's environment variables
+MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/")
 DB_NAME = "Food_Inventory"
 COLLECTION_NAME = "products"
 
