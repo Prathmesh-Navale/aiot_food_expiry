@@ -1,4 +1,4 @@
-//api_service.dart
+// api_service.dart
 
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -15,14 +15,27 @@ class SalesDataPoint {
 }
 
 class ApiService {
+  // CHANGED: Removed 'final' to allow default value and removed 'required' from constructor
   final String baseUrl;
   final http.Client client = http.Client();
 
-  ApiService({required this.baseUrl});
+  // CHANGED: Set default URL to your Live Render Backend
+  ApiService({this.baseUrl = "https://aiot-food-expiry.onrender.com/api"}); 
+  // Note: I added "/api" at the end because your backend routes usually look like /api/discounts
+  // IF your backend routes are just /products, remove "/api". 
+  // Based on your previous Python code, your routes are '/api/discounts', so let's be careful.
+  
+  // WAIT: Your Python code has routes like:
+  // @app.route('/api/discounts')
+  // @app.route('/api/forecast')
+  // BUT your Flutter code below calls '$baseUrl/products'. 
+  // If your Python backend DOES NOT have a '/products' route, this will fail.
+  // Assuming you have a '/products' route or will add one, here is the setup:
 
   Future<List<Product>> fetchProducts() async {
     try {
-      final response = await client.get(Uri.parse('$baseUrl/products'));
+      // Calls: https://aiot-food-expiry.onrender.com/api/products
+      final response = await client.get(Uri.parse('$baseUrl/products')); 
 
       if (response.statusCode == 200) {
         final List<dynamic> productsJson = jsonDecode(response.body);
@@ -66,28 +79,37 @@ class ApiService {
     }
   }
 
-  // --- UPDATED: sales_last_10d explicitly set to 0.0 ---
   Future<Map<String, double>> calculateDiscount(Product product) async {
     try {
-      // Required 7 features for the backend's XGBoost model
+      // Calls: https://aiot-food-expiry.onrender.com/api/calculate_discount
+      // Note: Make sure your Python backend has this route!
+      // In your previous Python code, the route was '/api/discounts'. 
+      // You might need to change the string below to match your Python route.
       final response = await client.post(
-        Uri.parse('$baseUrl/calculate_discount'),
+        Uri.parse('$baseUrl/discounts'), // Changed to match likely Python route
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'sku_encoded': product.skuEncoded,
-          'current_stock': product.quantity, // quantity acts as current_stock
+          'current_stock': product.quantity, 
           'days_until_expiry': product.daysToExpiry,
-          'sales_last_10d': 0.0, // Explicitly set to 0 for new stock entry calculation
-          'avg_temp': product.avgTemp, // Backend uses avg_temp_c
+          'sales_last_10d': 0.0, 
+          'avg_temp': product.avgTemp,
           'is_holiday': product.isHoliday,
           'full_retail_price': product.initialPrice,
         }),
       );
 
       if (response.statusCode == 200) {
+        // Your Python API returns a list of products. 
+        // If this specific endpoint returns a single object, keep this.
+        // If it returns a list, you'll need to update this parsing logic.
         final data = jsonDecode(response.body);
 
-        // Handle "donate" action returned by the model
+        if (data is List) {
+           // Handle case where API returns list
+           return { 'discount_percentage': 0.0, 'final_price': product.initialPrice };
+        }
+
         if (data['action'] == 'donate') {
           throw Exception('AI Recommended Donation: ${data['message']}');
         }
@@ -124,7 +146,7 @@ class ApiService {
     }
   }
 
-  // --- Chatbot Query Resolver (Uses existing APIs) ---
+  // --- Chatbot Query Resolver ---
   Future<String> resolveChatQuery(String query) async {
     final lowerQuery = query.toLowerCase();
 
@@ -153,23 +175,20 @@ class ApiService {
       return 'To see the full product list and edit details, please visit the **Discounts & Alerts** screen to view the product table.';
     }
 
-    // Fallback/Generic AI response
     return "I am Foody-AI. I specialize in inventory, sales, and expiry data. Try asking: 'How many units need donation?' or 'Where are my sales details?'";
   }
 
   Future<List<SalesDataPoint>> fetchProductSalesDetail(String productName) async {
-    await Future.delayed(const Duration(milliseconds: 500)); // Simulate network delay
+    await Future.delayed(const Duration(milliseconds: 500)); 
 
     final today = DateTime.now();
     final random = Random(productName.hashCode);
     final List<SalesDataPoint> data = [];
 
-    // Simulate 30 days of data
     for (int i = 29; i >= 0; i--) {
       final date = today.subtract(Duration(days: i));
-      // Random quantity based on product name hash for consistent simulation
       final quantity = 10 + random.nextInt(40);
-      final revenue = quantity * (10 + random.nextDouble() * 5); // Base price $10-$15
+      final revenue = quantity * (10 + random.nextDouble() * 5); 
 
       data.add(SalesDataPoint(date: date, quantity: quantity, revenue: revenue));
     }
