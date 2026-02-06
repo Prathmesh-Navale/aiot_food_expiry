@@ -1,0 +1,877 @@
+// lib/screens/inventory_screens.dart (Master File)
+
+import 'package:flutter/material.dart';
+import 'package:aiot_ui/services/api_service.dart';
+import 'package:aiot_ui/models/product.dart';
+import 'package:intl/intl.dart';
+import 'package:flutter/services.dart';
+
+// --- NEW IMPORT: Barcode Scanner Mock ---
+import 'barcode_scanner_screen.dart';
+// ----------------------------------------
+
+// --- Import the refactored screens ---
+import 'dashboard/main_dashboard_screen.dart';
+import 'dashboard/productivity_screen.dart';
+
+
+// --- UTILITY WIDGETS ---
+
+// Placeholder Screen for Extended Menu Items
+class PlaceholderScreen extends StatelessWidget {
+  final String title;
+  const PlaceholderScreen({super.key, required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(title)),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.construction, size: 60, color: Theme.of(context).colorScheme.primary),
+            const SizedBox(height: 20),
+            Text(
+              'Development In Progress for $title',
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'This module will provide specific functions for $title.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Reusable button widget for options screen
+class OptionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String description;
+  final Color color;
+  final VoidCallback onPressed;
+
+  const OptionButton({
+    required this.icon,
+    required this.label,
+    required this.description,
+    required this.color,
+    required this.onPressed,
+    super.key,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 450),
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      child: ElevatedButton(
+        onPressed: onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: color,
+          foregroundColor: Colors.black,
+          padding: const EdgeInsets.all(20),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          elevation: 8,
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 40, color: Colors.black),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black)),
+                  const SizedBox(height: 4),
+                  Text(description, style: TextStyle(fontSize: 12, color: Colors.black.withOpacity(0.7))),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios, size: 20, color: Colors.black),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// --- 6. STOCK ENTRY OPTIONS SCREEN (QR/Manual) ---
+class StockEntryOptionsScreen extends StatelessWidget {
+  final ApiService apiService;
+  final VoidCallback refreshHome;
+  final VoidCallback onProductAdded;
+
+  const StockEntryOptionsScreen({super.key, required this.apiService, required this.refreshHome, required this.onProductAdded});
+
+  // --- Function to handle navigation after scanning ---
+  void _startScan(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => BarcodeScannerScreen(
+          onScanCompleted: (scannedData) {
+            // Navigate to the Inventory Entry Screen, pre-filling data
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (context) => InventoryEntryScreen(
+                    apiService: apiService,
+                    onProductAdded: onProductAdded,
+                    initialData: scannedData, // Pass the scanned data
+                  )
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Stock Entry Options')),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Text(
+                'Initial Data Capture and Inventory Setup (AIoT)',
+                style: Theme.of(context).textTheme.headlineSmall,
+                textAlign: TextAlign.center,
+              ),
+            ),
+            const SizedBox(height: 30),
+
+            // QR Code Scan Button (REAL SCANNER LOGIC)
+            OptionButton(
+              icon: Icons.qr_code_scanner,
+              label: 'QR Code/Barcode Scan (IoT)',
+              description: 'Instantly integrate stock data via camera scanner.',
+              color: Theme.of(context).colorScheme.secondary,
+              onPressed: () => _startScan(context), // Uses the real scanner screen
+            ),
+            const SizedBox(height: 20),
+
+            // Manual Entry Button
+            OptionButton(
+              icon: Icons.edit_note,
+              label: 'Manual Data Entry',
+              description: 'Manually input all necessary product and expiry details.',
+              color: Theme.of(context).colorScheme.primary,
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => InventoryEntryScreen(apiService: apiService, onProductAdded: onProductAdded)),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// --- 7. MANUAL INVENTORY ENTRY SCREEN (UPDATED TO RECEIVE DATA) ---
+class InventoryEntryScreen extends StatefulWidget {
+  final ApiService apiService;
+  final VoidCallback onProductAdded;
+  final Map<String, dynamic>? initialData; // NEW: Optional data passed from scanner
+
+  const InventoryEntryScreen({super.key, required this.apiService, required this.onProductAdded, this.initialData});
+
+  @override
+  State<InventoryEntryScreen> createState() => _InventoryEntryScreenState();
+}
+
+class _InventoryEntryScreenState extends State<InventoryEntryScreen> {
+  final _formKey = GlobalKey<FormState>();
+
+  // --- Text Controllers for pre-filling ---
+  late TextEditingController _productNameController;
+  late TextEditingController _productSkuController;
+  late TextEditingController _initialPriceController;
+  late TextEditingController _quantityController;
+
+  // --- Form State Variables ---
+  // Default expiry set to a reasonable future date for any new item
+  DateTime _expiryDate = DateTime.now().add(const Duration(days: 90));
+  String _storageLocation = 'Shelf A';
+  bool _isLoading = false;
+
+  final List<String> locations = ['Shelf A', 'Fridge B', 'Freezer C', 'Warehouse D'];
+
+  // --- HARDCODED/SIMULATED AI INPUTS (for consistency) ---
+  // We keep these defaults here, they are not user-filled anyway.
+  static const int simulatedSkuEncoded = 201;
+  static const double simulatedAvgTemp = 22.0;
+  static const int simulatedIsHoliday = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    final data = widget.initialData;
+
+    // --- FIX APPLIED HERE: Use empty defaults if no initialData ---
+    if (data == null) {
+      // 1. Manual Entry: Initialize with empty strings and default values
+      _productNameController = TextEditingController(text: '');
+      _productSkuController = TextEditingController(text: '');
+      _initialPriceController = TextEditingController(text: '');
+      _quantityController = TextEditingController(text: '1'); // Default quantity to 1
+      _expiryDate = DateTime.now().add(const Duration(days: 90));
+      _storageLocation = 'Shelf A'; // Explicit default
+    } else {
+      // 2. Scanner Entry: Initialize with specific scanned data (Cold Drink Cola)
+      // Use null-aware operators to default to empty/zero if scan data is missing keys
+      _productNameController = TextEditingController(text: data['productName'] ?? '');
+      _productSkuController = TextEditingController(text: data['productSku'] ?? '');
+      _initialPriceController = TextEditingController(text: data['initialPrice']?.toStringAsFixed(2) ?? '');
+      _quantityController = TextEditingController(text: data['quantity']?.toString() ?? '1');
+
+      if (data['storageLocation'] != null) {
+        _storageLocation = data['storageLocation'];
+      }
+
+      // Handle expiry date: use data['expiryDays'] if scanned, otherwise use default
+      if (data['expiryDays'] != null) {
+        _expiryDate = DateTime.now().add(Duration(days: data['expiryDays'] as int));
+      } else {
+        _expiryDate = DateTime.now().add(const Duration(days: 90));
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _productNameController.dispose();
+    _productSkuController.dispose();
+    _initialPriceController.dispose();
+    _quantityController.dispose();
+    super.dispose();
+  }
+
+  // --- NEW: Helper function to reset all form fields ---
+  void _resetForm() {
+    _productNameController.clear();
+    _productSkuController.clear();
+    _initialPriceController.clear();
+    _quantityController.text = '1'; // Reset quantity to 1
+
+    // Reset state variables
+    setState(() {
+      _storageLocation = 'Shelf A';
+      _expiryDate = DateTime.now().add(const Duration(days: 90));
+      _formKey.currentState?.reset(); // Resets form validation state
+    });
+  }
+  // ----------------------------------------------------
+
+  Future<void> _selectDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _expiryDate,
+      firstDate: DateTime.now(),
+      lastDate: DateTime(2030),
+    );
+    if (picked != null && picked != _expiryDate) {
+      setState(() {
+        _expiryDate = picked;
+      });
+    }
+  }
+
+  Future<void> _submitForm() async {
+    if (_formKey.currentState!.validate()) {
+      setState(() {
+        _isLoading = true;
+      });
+
+      // Construct Product object using controller values and hardcoded AI inputs
+      final newProduct = Product(
+        productName: _productNameController.text.trim(),
+        initialPrice: double.tryParse(_initialPriceController.text) ?? 0.0,
+        quantity: int.tryParse(_quantityController.text) ?? 0,
+        expiryDate: _expiryDate,
+        storageLocation: _storageLocation,
+
+        // --- PASS SIMULATED AI DATA ---
+        productSku: _productSkuController.text.trim(),
+        skuEncoded: simulatedSkuEncoded,
+        avgTemp: simulatedAvgTemp,
+        isHoliday: simulatedIsHoliday,
+        // ------------------------------
+      );
+
+      try {
+        await widget.apiService.addProduct(newProduct);
+
+        // --- SUCCESS ACTIONS (UPDATED) ---
+        widget.onProductAdded();
+
+        if (mounted) {
+          // 1. Show SUCCESS message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('SUCCESS: Product ${newProduct.productName} stored in database.')),
+          );
+
+          // 2. Clear the form fields for new entry
+          _resetForm();
+        }
+      } catch (e) {
+        if (mounted) {
+          // Check for specific backend errors, though generic error is often enough
+          String errorDetail = e.toString().contains(':') ? e.toString().split(':')[1].trim() : 'Unknown error';
+
+          // Show FAILED message, allowing the user to see the data they tried to submit
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Database Error: Failed to add product ($errorDetail)')),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Manual Stock Entry')),
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24.0),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 600),
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Theme.of(context).cardColor,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: const [BoxShadow(color: Colors.black38, blurRadius: 10)],
+            ),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Database Integration: Food Item Details', style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Theme.of(context).colorScheme.primary)),
+                  const Divider(height: 20),
+
+                  // Product Name
+                  TextFormField(
+                    controller: _productNameController,
+                    decoration: const InputDecoration(labelText: 'Food Item Name', prefixIcon: Icon(Icons.fastfood)),
+                    validator: (value) => value == null || value.isEmpty ? 'Please enter the item name' : null,
+                  ),
+                  const SizedBox(height: 16),
+
+                  // SKU/Barcode
+                  TextFormField(
+                    controller: _productSkuController,
+                    decoration: const InputDecoration(labelText: 'SKU / Barcode (e.g., COLA-330-001)', prefixIcon: Icon(Icons.qr_code)),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Initial Price
+                  TextFormField(
+                    controller: _initialPriceController,
+                    decoration: const InputDecoration(labelText: 'Initial Price (\$) / Unit', prefixIcon: Icon(Icons.attach_money)),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))],
+                    validator: (value) {
+                      final price = double.tryParse(value ?? '');
+                      return price == null || price <= 0 ? 'Enter a valid price' : null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Quantity
+                  TextFormField(
+                    controller: _quantityController,
+                    decoration: const InputDecoration(labelText: 'Quantity (Units)', prefixIcon: Icon(Icons.format_list_numbered)),
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    validator: (value) {
+                      final qty = int.tryParse(value ?? '');
+                      return qty == null || qty <= 0 ? 'Enter a valid quantity' : null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Storage Location
+                  DropdownButtonFormField<String>(
+                    decoration: const InputDecoration(labelText: 'Storage Location', prefixIcon: Icon(Icons.location_on)),
+                    value: _storageLocation,
+                    items: locations.map((String location) {
+                      return DropdownMenuItem<String>(
+                        value: location,
+                        child: Text(location),
+                      );
+                    }).toList(),
+                    onChanged: (String? newValue) {
+                      if (newValue != null) {
+                        setState(() {
+                          _storageLocation = newValue;
+                        });
+                      }
+                    },
+                    dropdownColor: Theme.of(context).cardColor,
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Expiry Date Picker
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.calendar_today),
+                    title: Text('Expiry Date: ${DateFormat('yyyy-MM-dd').format(_expiryDate)}', style: Theme.of(context).textTheme.bodyMedium),
+                    trailing: TextButton(
+                      onPressed: () => _selectDate(context),
+                      child: Text('Select Date', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // --- AI Context Display (Informational Only) ---
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12.0),
+                    child: Text(
+                      'AI Context: Temp=${simulatedAvgTemp}°C, Holiday=${simulatedIsHoliday == 1 ? 'Yes' : 'No'}, Encoded SKU=${simulatedSkuEncoded}',
+                      style: const TextStyle(color: Colors.grey, fontStyle: FontStyle.italic, fontSize: 12),
+                    ),
+                  ),
+
+                  // Submit Button
+                  _isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : ElevatedButton.icon(
+                    icon: const Icon(Icons.save),
+                    label: const Text('Save Stock to Database', style: TextStyle(fontSize: 16)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      foregroundColor: Colors.black,
+                      minimumSize: const Size(double.infinity, 50),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: _submitForm,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// --- 8. ALERTS & DISCOUNTS SCREEN (First Alert) ---
+class AlertsDiscountsScreen extends StatefulWidget {
+  final ApiService apiService;
+  final VoidCallback refreshHome;
+
+  const AlertsDiscountsScreen({super.key, required this.apiService, required this.refreshHome});
+
+  @override
+  State<AlertsDiscountsScreen> createState() => _AlertsDiscountsScreenState();
+}
+
+class _AlertsDiscountsScreenState extends State<AlertsDiscountsScreen> {
+  late Future<List<Product>> _productsFuture;
+  final int firstAlertDays = 10;
+  final int secondAlertDays = 4;
+
+  @override
+  void initState() {
+    super.initState();
+    _productsFuture = _fetchProductsAndCheckAlerts();
+  }
+
+  Future<List<Product>> _fetchProductsAndCheckAlerts() async {
+    List<Product> products = await widget.apiService.fetchProducts();
+
+    List<Product> processedProducts = [];
+    for (var product in products) {
+      if (product.daysToExpiry > 0 && product.daysToExpiry <= firstAlertDays && product.status == 'For Sale') {
+        try {
+          final result = await widget.apiService.calculateDiscount(product);
+          // FIX: Use the copyProductWith method from the Product model
+          processedProducts.add(product.copyProductWith(
+            discountPercentage: result['discount_percentage'] ?? 0.0,
+            finalPrice: result['final_price'] ?? product.initialPrice,
+            status: 'Discount Active',
+          ));
+        } catch (e) {
+          processedProducts.add(product);
+          print('Error calculating discount for ${product.productName}: $e');
+        }
+      } else {
+        processedProducts.add(product);
+      }
+    }
+    return processedProducts;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<Product>>(
+      future: _productsFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(child: Text('Connection Error: ${snapshot.error}. Ensure FastAPI is running on ${const String.fromEnvironment('BASE_URL', defaultValue: 'http://127.0.0.1:8000')}'));
+        }
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const Center(child: Text('No inventory items found. Add stock via Stock Entry.'));
+        }
+
+        final alertProducts = snapshot.data!
+            .where((p) => p.daysToExpiry > 0 && p.daysToExpiry <= firstAlertDays && p.status != 'Donated')
+            .toList();
+
+        return RefreshIndicator(
+          onRefresh: () async {
+            setState(() {
+              _productsFuture = _fetchProductsAndCheckAlerts();
+            });
+          },
+          child: ListView(
+            padding: const EdgeInsets.all(16.0),
+            children: [
+              Text(
+                'First Alert: Dynamic Discounting for Revenue Recovery',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary),
+              ),
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8.0),
+                child: Text('Items approaching expiry (10 days or less). AI determines the optimal discount to drive sales.'),
+              ),
+              const Divider(),
+              if (alertProducts.isEmpty)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(40.0),
+                    child: Text('No items currently triggering the 10-day discount alert.', style: TextStyle(fontSize: 16, color: Colors.grey)),
+                  ),
+                ),
+              ...alertProducts.map((product) {
+                final isDonationAlert = product.daysToExpiry <= secondAlertDays;
+
+                return DiscountAlertCard(
+                  key: ValueKey(product.id),
+                  product: product,
+                  isDonationAlert: isDonationAlert,
+                  apiService: widget.apiService,
+                );
+              }).toList(),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+// Widget for Dynamic Discounting Display and Recipe
+class DiscountAlertCard extends StatefulWidget {
+  final Product product;
+  final bool isDonationAlert;
+  final ApiService apiService;
+
+  const DiscountAlertCard({
+    super.key,
+    required this.product,
+    required this.isDonationAlert,
+    required this.apiService,
+  });
+
+  @override
+  State<DiscountAlertCard> createState() => _DiscountAlertCardState();
+}
+
+class _DiscountAlertCardState extends State<DiscountAlertCard> {
+  String _recipeSuggestion = 'Fetching AI Recipe...';
+  bool _isLoadingRecipe = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchRecipe();
+  }
+
+  Future<void> _fetchRecipe() async {
+    setState(() {
+      _isLoadingRecipe = true;
+      _recipeSuggestion = 'Fetching AI Recipe...';
+    });
+    try {
+      final recipe = await widget.apiService.getRecipeSuggestion(widget.product.productName);
+      setState(() {
+        _recipeSuggestion = recipe;
+      });
+    } catch (e) {
+      setState(() {
+        _recipeSuggestion = 'Error fetching recipe: ${e.toString().split(':')[1].trim()}';
+      });
+    } finally {
+      setState(() {
+        _isLoadingRecipe = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 4,
+      margin: const EdgeInsets.only(bottom: 16),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: widget.isDonationAlert ? Colors.red.shade700 : Theme.of(context).colorScheme.primary,
+          width: 2,
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    widget.product.productName,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Chip(
+                  label: Text(
+                    '${widget.product.daysToExpiry} days left',
+                    style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+                  ),
+                  backgroundColor: widget.isDonationAlert ? Colors.red : Colors.orange,
+                ),
+              ],
+            ),
+            const Divider(height: 10),
+            Text('Location: ${widget.product.storageLocation} | Qty: ${widget.product.quantity}'),
+            const SizedBox(height: 8),
+
+            // AI Discount and Pricing
+            Text('AI Dynamic Pricing', style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
+            Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 10,
+              children: [
+                Text('Original: \$${widget.product.initialPrice.toStringAsFixed(2)}', style: const TextStyle(decoration: TextDecoration.lineThrough)),
+                Text(
+                  'AI Price: \$${widget.product.finalPrice.toStringAsFixed(2)}',
+                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.lightGreen, fontSize: 16),
+                ),
+                Text('(${widget.product.discountPercentage.toStringAsFixed(0)}% OFF)', style: const TextStyle(color: Colors.red)),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Real-Time Customer Interface simulation
+            ExpansionTile(
+              title: const Text('Real-Time Customer Interface Preview (LCD/QR)', style: TextStyle(fontWeight: FontWeight.w600)),
+              collapsedBackgroundColor: Theme.of(context).cardColor,
+              backgroundColor: Theme.of(context).cardColor,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              children: <Widget>[
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'LCD Display: ${widget.product.productName} - ${widget.product.discountPercentage.toStringAsFixed(0)}% OFF!',
+                        style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.secondary),
+                      ),
+                      const SizedBox(height: 8),
+                      // QR Code Recipe Simulation (Encourages immediate purchase)
+                      const Text(
+                        'QR Code Recipe: "This food is expiring soon—make this recipe for tonight\'s dinner!"',
+                        style: TextStyle(fontStyle: FontStyle.italic),
+                      ),
+                      const SizedBox(height: 4),
+                      _isLoadingRecipe
+                          ? const LinearProgressIndicator()
+                          : Text(
+                        _recipeSuggestion,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+
+            if (widget.isDonationAlert)
+              Padding(
+                padding: const EdgeInsets.only(top: 12.0),
+                child: Text(
+                  'Action Required: Item is within 4 days of expiry and should be moved to the Donation Dashboard.',
+                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red[400]),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// --- 9. DONATION SCREEN (Second Alert & Management) ---
+class DonationScreen extends StatefulWidget {
+  final ApiService apiService;
+  final VoidCallback refreshHome;
+
+  const DonationScreen({super.key, required this.apiService, required this.refreshHome});
+
+  @override
+  State<DonationScreen> createState() => _DonationScreenState();
+}
+
+class _DonationScreenState extends State<DonationScreen> {
+  late Future<List<Product>> _productsFuture;
+  final int donationThresholdDays = 4;
+
+  @override
+  void initState() {
+    super.initState();
+    _productsFuture = widget.apiService.fetchProducts();
+  }
+
+  Future<void> _markAsDonated(String id, String productName) async {
+    // Using DELETE as a proxy for "logging and removing for donation"
+    try {
+      await widget.apiService.deleteProduct(id);
+      widget.refreshHome(); // Refresh the entire home view
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Successfully logged donation and removed: $productName.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to log donation (API Error): ${e.toString().split(':')[1].trim()}')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<Product>>(
+      future: _productsFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(child: Text('Connection Error: ${snapshot.error}'));
+        }
+        if (!snapshot.hasData) return const Center(child: Text('No Data'));
+
+        final donationCandidates = snapshot.data!
+            .where((p) => p.daysToExpiry > 0 && p.daysToExpiry <= donationThresholdDays && p.status != 'Donated')
+            .toList();
+
+        return RefreshIndicator(
+          onRefresh: () async {
+            setState(() {
+              _productsFuture = widget.apiService.fetchProducts();
+            });
+          },
+          child: ListView(
+            padding: const EdgeInsets.all(16.0),
+            children: [
+              Text(
+                'Second Alert: Donation and Final Sale Strategy',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: Colors.red[400]),
+              ),
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8.0),
+                child: Text('Items expiring in **4 days or less**. AI suggests a split between final, deep-discount sale and necessary donation.'),
+              ),
+              const Divider(),
+
+              if (donationCandidates.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.only(top: 50.0),
+                  child: Center(
+                    child: Column(
+                      children: [
+                        Icon(Icons.check_circle_outline, size: 80, color: Colors.lightGreen),
+                        SizedBox(height: 16),
+                        Text('All donation candidates have been cleared or are not yet critical.', style: TextStyle(fontSize: 16)),
+                      ],
+                    ),
+                  ),
+                ),
+
+              ...donationCandidates.map((product) {
+                return DonationCandidateCard(
+                  product: product,
+                  onDonate: _markAsDonated,
+                );
+              }).toList(),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+// Widget for a single donation item
+class DonationCandidateCard extends StatelessWidget {
+  final Product product;
+  final Function(String, String) onDonate;
+
+  const DonationCandidateCard({required this.product, required this.onDonate, super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 2,
+      margin: const EdgeInsets.only(bottom: 12),
+      color: Theme.of(context).cardColor,
+      child: ListTile(
+        leading: Icon(Icons.warning, color: Colors.red.shade400, size: 30),
+        title: Text('${product.productName} (Qty: ${product.quantity})', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red.shade200)),
+        subtitle: Text('Expiring in ${product.daysToExpiry} days | Location: ${product.storageLocation}'),
+        trailing: ElevatedButton.icon(
+          icon: const Icon(Icons.thumb_up),
+          label: const Text('Log Donation'),
+          onPressed: product.id == null ? null : () => onDonate(product.id!, product.productName),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.red,
+            foregroundColor: Colors.black,
+          ),
+        ),
+      ),
+    );
+  }
+}

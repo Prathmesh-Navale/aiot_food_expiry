@@ -1,0 +1,32 @@
+name: aiot_ui
+description: "AIoT-Powered Food Expiry Detection and Alert System Frontend."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  fl_chart: ^0.66.0
+  flutter:
+    sdk: flutter
+
+  # MANDATORY packages for core functionality
+  http: ^1.2.1
+  intl: ^0.19.0        # Required for DateFormat utility
+  mobile_scanner: ^4.0.0 # Recommended scanning package
+  permission_handler: ^11.0.1 # For camera permissions
+
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+
+ 
