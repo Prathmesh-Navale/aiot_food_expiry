@@ -1,0 +1,10 @@
+flask
+flask-cors
+pymongo
+pandas
+numpy
+joblib
+scikit-learn
+prophet
+datetime
+gunicorn

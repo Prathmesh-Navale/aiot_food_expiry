@@ -13,7 +13,8 @@ CORS(app)
 # ==========================================
 # 0. CONFIGURATION & RESOURCES
 # ==========================================
-MONGO_URI = "mongodb://localhost:27017/"
+import os
+MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/")
 DB_NAME = "Food_Inventory"
 INVENTORY_COLLECTION = "products"      
 SALES_COLLECTION = "SalesHistory"     
