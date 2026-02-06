@@ -1,29 +1,38 @@
 import pandas as pd
+import os
+import joblib
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error
-from pymongo import MongoClient  # <--- NEW IMPORT
-import joblib
+from pymongo import MongoClient
 
 # ==========================================
 # 1. LOAD DATA FROM MONGODB
 # ==========================================
 print("⏳ Connecting to MongoDB...")
 
-import os
-
 # Get the cloud URI from Render's environment variables
+# If running locally, it falls back to localhost
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/")
 DB_NAME = "Food_Inventory"
 COLLECTION_NAME = "products"
 
+# Debugging: Check if we are using the cloud URI or Localhost
+if "localhost" in MONGO_URI:
+    print("⚠️ WARNING: Using Localhost. This will FAIL on Render unless you have a local DB.")
+else:
+    print("✅ Using Cloud Database Connection.")
+
 try:
     # Connect
-    client = MongoClient(MONGO_URI)
+    client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000) # 5s timeout
     db = client[DB_NAME]
     collection = db[COLLECTION_NAME]
 
+    # Check connection by forcing a server call
+    client.server_info()
+    
     # Fetch Data (Exclude _id to keep DataFrame clean)
     data = list(collection.find({}, {"_id": 0}))
     
@@ -31,16 +40,18 @@ try:
     df = pd.DataFrame(data)
     
     if df.empty:
-        raise ValueError("❌ Error: MongoDB collection is empty! Cannot train model.")
+        # We raise SystemExit to force the build to fail if there is no data
+        raise SystemExit("❌ Error: MongoDB collection is empty! Cannot train model.")
         
     print(f"✅ Loaded {len(df)} records from MongoDB.")
 
 except Exception as e:
-    print(f"❌ Database Error: {e}")
-    exit()
+    print(f"❌ Database Connection Error: {e}")
+    # This ensures Render knows the build failed
+    raise SystemExit(1) 
 
 # ==========================================
-# 2. PREPROCESSING (Same as before)
+# 2. PREPROCESSING
 # ==========================================
 
 # Select features
@@ -59,15 +70,16 @@ try:
     y = df["discount_percent"]
 except KeyError as e:
     print(f"❌ Error: Missing column in MongoDB data: {e}")
-    exit()
+    raise SystemExit(1)
 
 # Label encode product name
 le = LabelEncoder()
 X["product_name"] = le.fit_transform(X["product_name"])
 
-# Save the label encoder mapping for future use (Optional but Recommended)
-# This lets you know that 0 = 'Apple', 1 = 'Banana', etc.
-print("Product Mapping Created:", dict(zip(le.classes_, le.transform(le.classes_))))
+# --- CRITICAL FIX: SAVE THE ENCODER ---
+# Your main.py needs this file to decode product names later!
+joblib.dump(le, "product_encoder.pkl")
+print("💾 Encoder saved as 'product_encoder.pkl'")
 
 # ==========================================
 # 3. TRAINING
