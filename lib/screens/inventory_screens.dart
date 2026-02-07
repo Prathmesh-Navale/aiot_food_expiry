@@ -5,7 +5,7 @@ import 'package:aiot_ui/services/api_service.dart';
 import 'package:aiot_ui/models/product.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/services.dart';
-
+import 'donation_screen.dart';
 // --- NEW IMPORT: Barcode Scanner Mock ---
 import 'barcode_scanner_screen.dart';
 // ----------------------------------------
@@ -741,16 +741,6 @@ class _DiscountAlertCardState extends State<DiscountAlertCard> {
   }
 }
 
-// --- 9. DONATION SCREEN (Second Alert & Management) ---
-class DonationScreen extends StatefulWidget {
-  final ApiService apiService;
-  final VoidCallback refreshHome;
-
-  const DonationScreen({super.key, required this.apiService, required this.refreshHome});
-
-  @override
-  State<DonationScreen> createState() => _DonationScreenState();
-}
 
 class _DonationScreenState extends State<DonationScreen> {
   late Future<List<Product>> _productsFuture;
