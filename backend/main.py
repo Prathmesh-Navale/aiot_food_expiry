@@ -7,6 +7,7 @@ from pymongo import MongoClient
 from prophet import Prophet 
 from datetime import datetime, timedelta
 import os
+import certifi
 
 app = Flask(__name__)
 CORS(app)
@@ -72,7 +73,7 @@ def calculate_strategy(row):
 @app.route('/api/discounts', methods=['GET'])
 def get_discounts():
     try:
-        client = MongoClient(MONGO_URI)
+        client = MongoClient(MONGO_URI, tlsCAFile=certifi.where())
         collection = client[DB_NAME][INVENTORY_COLLECTION]
         data = list(collection.find({}, {"_id": 0}))
         
@@ -129,7 +130,7 @@ def get_discounts():
 @app.route('/api/forecast', methods=['GET'])
 def get_forecast():
     try:
-        client = MongoClient(MONGO_URI)
+        client = MongoClient(MONGO_URI, tlsCAFile=certifi.where())
         col = client[DB_NAME][SALES_COLLECTION]
         data = list(col.find({}, {"_id": 0}))
         
