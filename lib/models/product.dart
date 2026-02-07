@@ -33,7 +33,7 @@ class Product {
     this.isHoliday = 0,
   });
 
-  // ✅ ADDED BACK: This method is required by your Inventory Screen
+  // ✅ FIXED: I added this method back so your build won't fail!
   Product copyProductWith({
     String? id,
     String? productName,
@@ -66,7 +66,7 @@ class Product {
     );
   }
 
-  // ✅ FACTORY: Maps Python API keys to Flutter variables
+  // ✅ FACTORY: This maps Python Data to Flutter variables
   factory Product.fromJson(Map<String, dynamic> json) {
     T getValue<T>(dynamic val, T defaultValue) {
       if (val == null) return defaultValue;
@@ -78,7 +78,7 @@ class Product {
       return defaultValue;
     }
 
-    // 1. Handle Date Parsing
+    // 1. Handle Date Logic (Python sends 'remaining_life', not a date)
     DateTime parsedDate;
     if (json['expiry_date'] != null) {
       try {
@@ -87,6 +87,7 @@ class Product {
         parsedDate = DateTime.now().add(const Duration(days: 7));
       }
     } else if (json['remaining_life'] != null) {
+      // Convert "Days Left" to a Real Date
       int daysLeft = getValue<int>(json['remaining_life'], 0);
       parsedDate = DateTime.now().add(Duration(days: daysLeft));
     } else {
@@ -104,14 +105,27 @@ class Product {
 
     return Product(
       id: idString,
+      // Map 'product_name' (Python) to 'productName' (Flutter)
       productName: json['product_name'] ?? json['name'] ?? 'Unknown Product',
+      
+      // Map 'marked_price' to 'initialPrice'
       initialPrice: getValue<double>(json['marked_price'] ?? json['initial_price'], 0.0),
+      
+      // Map 'current_stock' to 'quantity'
       quantity: getValue<int>(json['current_stock'] ?? json['quantity'], 0),
+      
       expiryDate: parsedDate,
       storageLocation: json['storage_location'] ?? 'Shelf A',
+      
+      // Map 'final_discount_pct' to 'discountPercentage'
       discountPercentage: getValue<double>(json['final_discount_pct'] ?? json['discount_percentage'], 0.0),
+      
+      // Map 'final_selling_price' to 'finalPrice'
       finalPrice: getValue<double>(json['final_selling_price'] ?? json['final_price'], 0.0),
+      
+      // Map 'action_status' to 'status'
       status: json['action_status'] ?? json['status'] ?? 'For Sale',
+      
       productSku: json['sku'] ?? '',
       skuEncoded: getValue<int>(json['sku_encoded'], 1),
       avgTemp: getValue<double>(json['avg_temp'], 20.0),
