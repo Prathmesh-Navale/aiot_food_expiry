@@ -1,5 +1,4 @@
-import 'dart:convert';
-
+// lib/models/product.dart
 class Product {
   final String? id;
   final String productName;
@@ -10,8 +9,6 @@ class Product {
   final double discountPercentage;
   final double finalPrice;
   final String status;
-
-  // --- AI Context Fields ---
   final String productSku;
   final int skuEncoded;
   final double avgTemp;
@@ -33,7 +30,6 @@ class Product {
     this.isHoliday = 0,
   });
 
-  // ✅ CRITICAL: This method is used by the UI to update local state
   Product copyProductWith({
     String? id,
     String? productName,
