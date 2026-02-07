@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'services/api_service.dart';
 import 'screens/home_screen.dart';
-import 'screens/inventory_screens.dart'; // Import for direct route access
+import 'screens/inventory_screens.dart'; // Import for specific route widgets
 
 // URL for your Render Backend
 const String BASE_URL = 'https://aiot-food-expiry.onrender.com';
@@ -26,16 +26,16 @@ class AIoTInventoryApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final apiService = ApiService(baseUrl: BASE_URL);
 
-    // Dummy callbacks for direct routing
-    final VoidCallback dummyRefresh = () { print("Refresh"); };
-    final VoidCallback dummyOnProductAdded = () { print("Product Added"); };
+    // Dummy callbacks
+    final VoidCallback dummyRefresh = () => print("Refresh");
+    final VoidCallback dummyOnProductAdded = () => print("Added");
 
     return MaterialApp(
       title: 'AIoT Smart Food Management',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark(useMaterial3: true).copyWith(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF00C853), // Modern Green
+          seedColor: const Color(0xFF00C853),
           brightness: Brightness.dark,
           primary: const Color(0xFF00C853),
           secondary: const Color(0xFF69F0AE),
@@ -67,16 +67,16 @@ class AIoTInventoryApp extends StatelessWidget {
       routes: {
         '/login': (context) => const LoginScreenStub(),
         '/home': (context) {
-           // Basic argument handling
-           String storeName = 'Default Store';
-           final args = ModalRoute.of(context)?.settings.arguments;
-           if (args is String) storeName = args;
-           return HomeScreen(apiService: apiService, storeName: storeName);
+           // Simple argument handling
+           return HomeScreen(apiService: apiService, storeName: 'My Store');
         },
         '/stock-options': (context) => StockEntryOptionsScreen(apiService: apiService, refreshHome: dummyRefresh, onProductAdded: dummyOnProductAdded),
         '/manual-entry': (context) => InventoryEntryScreen(apiService: apiService, onProductAdded: dummyOnProductAdded),
         '/alerts-discounts': (context) => AlertsDiscountsScreen(apiService: apiService, refreshHome: dummyRefresh),
         '/donation': (context) => DonationScreen(apiService: apiService, refreshHome: dummyRefresh),
+        '/profile': (context) => const PlaceholderScreen(title: 'Store Profile'),
+        '/contact': (context) => const PlaceholderScreen(title: 'Contact Us'),
+        '/support': (context) => const PlaceholderScreen(title: 'Support Desk'),
       },
     );
   }
@@ -89,8 +89,8 @@ class LoginScreenStub extends StatelessWidget {
     return Scaffold(
       body: Center(
         child: ElevatedButton(
-          child: const Text("LOGIN (Stub)"),
-          onPressed: () => Navigator.pushReplacementNamed(context, '/home', arguments: 'My AIoT Store'),
+          onPressed: () => Navigator.pushReplacementNamed(context, '/home'),
+          child: const Text("LOGIN (Bypass)"),
         ),
       ),
     );

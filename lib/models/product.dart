@@ -9,6 +9,8 @@ class Product {
   final double discountPercentage;
   final double finalPrice;
   final String status;
+
+  // --- NEW FIELDS ---
   final String productSku;
   final int skuEncoded;
   final double avgTemp;

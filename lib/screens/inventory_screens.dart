@@ -1,11 +1,90 @@
 // lib/screens/inventory_screens.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../services/api_service.dart';
 import '../models/product.dart';
 
-// --- STOCK ENTRY OPTIONS ---
+// --- UTILITY WIDGETS ---
+
+class PlaceholderScreen extends StatelessWidget {
+  final String title;
+  const PlaceholderScreen({super.key, required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(title)),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.construction, size: 60, color: Theme.of(context).colorScheme.primary),
+            const SizedBox(height: 20),
+            Text('Development In Progress for $title', style: Theme.of(context).textTheme.headlineSmall),
+            const SizedBox(height: 10),
+            Text('This module will provide specific functions for $title.', style: Theme.of(context).textTheme.bodyMedium),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class OptionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String description;
+  final Color color;
+  final VoidCallback onPressed;
+
+  const OptionButton({
+    required this.icon,
+    required this.label,
+    required this.description,
+    required this.color,
+    required this.onPressed,
+    super.key,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 450),
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      child: ElevatedButton(
+        onPressed: onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: color,
+          foregroundColor: Colors.black,
+          padding: const EdgeInsets.all(20),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          elevation: 8,
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 40, color: Colors.black),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black)),
+                  const SizedBox(height: 4),
+                  Text(description, style: TextStyle(fontSize: 12, color: Colors.black.withOpacity(0.7))),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios, size: 20, color: Colors.black),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// --- STOCK ENTRY OPTIONS SCREEN ---
 class StockEntryOptionsScreen extends StatelessWidget {
   final ApiService apiService;
   final VoidCallback refreshHome;
@@ -14,11 +93,10 @@ class StockEntryOptionsScreen extends StatelessWidget {
   const StockEntryOptionsScreen({super.key, required this.apiService, required this.refreshHome, required this.onProductAdded});
 
   void _startScan(BuildContext context) {
-    // Replaced external import with direct navigation to internal mock
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => BarcodeScannerMock(
+        builder: (context) => BarcodeScannerScreen(
           onScanCompleted: (scannedData) {
             Navigator.push(
               context,
@@ -26,7 +104,7 @@ class StockEntryOptionsScreen extends StatelessWidget {
                   builder: (context) => InventoryEntryScreen(
                     apiService: apiService,
                     onProductAdded: onProductAdded,
-                    initialData: scannedData,
+                    initialData: scannedData, 
                   )
               ),
             );
@@ -80,55 +158,14 @@ class StockEntryOptionsScreen extends StatelessWidget {
   }
 }
 
-class OptionButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String description;
-  final Color color;
-  final VoidCallback onPressed;
-  const OptionButton({required this.icon, required this.label, required this.description, required this.color, required this.onPressed, super.key});
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(maxWidth: 450),
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      child: ElevatedButton(
-        onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: color,
-          foregroundColor: Colors.black,
-          padding: const EdgeInsets.all(20),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-          elevation: 8,
-        ),
-        child: Row(
-          children: [
-            Icon(icon, size: 40, color: Colors.black),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(label, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black)),
-                  const SizedBox(height: 4),
-                  Text(description, style: TextStyle(fontSize: 12, color: Colors.black.withOpacity(0.7))),
-                ],
-              ),
-            ),
-            const Icon(Icons.arrow_forward_ios, size: 20, color: Colors.black),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// --- MANUAL ENTRY SCREEN ---
+// --- MANUAL INVENTORY ENTRY SCREEN ---
 class InventoryEntryScreen extends StatefulWidget {
   final ApiService apiService;
   final VoidCallback onProductAdded;
   final Map<String, dynamic>? initialData;
+
   const InventoryEntryScreen({super.key, required this.apiService, required this.onProductAdded, this.initialData});
+
   @override
   State<InventoryEntryScreen> createState() => _InventoryEntryScreenState();
 }
@@ -139,10 +176,15 @@ class _InventoryEntryScreenState extends State<InventoryEntryScreen> {
   late TextEditingController _productSkuController;
   late TextEditingController _initialPriceController;
   late TextEditingController _quantityController;
+
   DateTime _expiryDate = DateTime.now().add(const Duration(days: 90));
   String _storageLocation = 'Shelf A';
   bool _isLoading = false;
   final List<String> locations = ['Shelf A', 'Fridge B', 'Freezer C', 'Warehouse D'];
+
+  static const int simulatedSkuEncoded = 201;
+  static const double simulatedAvgTemp = 22.0;
+  static const int simulatedIsHoliday = 0;
 
   @override
   void initState() {
@@ -161,7 +203,11 @@ class _InventoryEntryScreenState extends State<InventoryEntryScreen> {
       _initialPriceController = TextEditingController(text: data['initialPrice']?.toStringAsFixed(2) ?? '');
       _quantityController = TextEditingController(text: data['quantity']?.toString() ?? '1');
       if (data['storageLocation'] != null) _storageLocation = data['storageLocation'];
-      if (data['expiryDays'] != null) _expiryDate = DateTime.now().add(Duration(days: data['expiryDays'] as int));
+      if (data['expiryDays'] != null) {
+        _expiryDate = DateTime.now().add(Duration(days: data['expiryDays'] as int));
+      } else {
+        _expiryDate = DateTime.now().add(const Duration(days: 90));
+      }
     }
   }
 
@@ -202,7 +248,7 @@ class _InventoryEntryScreenState extends State<InventoryEntryScreen> {
 
   Future<void> _submitForm() async {
     if (_formKey.currentState!.validate()) {
-      setState(() { _isLoading = true; });
+      setState(() => _isLoading = true);
       final newProduct = Product(
         productName: _productNameController.text.trim(),
         initialPrice: double.tryParse(_initialPriceController.text) ?? 0.0,
@@ -210,8 +256,11 @@ class _InventoryEntryScreenState extends State<InventoryEntryScreen> {
         expiryDate: _expiryDate,
         storageLocation: _storageLocation,
         productSku: _productSkuController.text.trim(),
-        skuEncoded: 201, avgTemp: 22.0, isHoliday: 0,
+        skuEncoded: simulatedSkuEncoded,
+        avgTemp: simulatedAvgTemp,
+        isHoliday: simulatedIsHoliday,
       );
+
       try {
         await widget.apiService.addProduct(newProduct);
         widget.onProductAdded();
@@ -225,7 +274,7 @@ class _InventoryEntryScreenState extends State<InventoryEntryScreen> {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Database Error: Failed to add product ($errorDetail)')));
         }
       } finally {
-        if (mounted) setState(() { _isLoading = false; });
+        if (mounted) setState(() => _isLoading = false);
       }
     }
   }
@@ -261,7 +310,7 @@ class _InventoryEntryScreenState extends State<InventoryEntryScreen> {
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _productSkuController,
-                    decoration: const InputDecoration(labelText: 'SKU / Barcode (e.g., COLA-330-001)', prefixIcon: Icon(Icons.qr_code)),
+                    decoration: const InputDecoration(labelText: 'SKU / Barcode', prefixIcon: Icon(Icons.qr_code)),
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
@@ -289,12 +338,8 @@ class _InventoryEntryScreenState extends State<InventoryEntryScreen> {
                   DropdownButtonFormField<String>(
                     decoration: const InputDecoration(labelText: 'Storage Location', prefixIcon: Icon(Icons.location_on)),
                     value: _storageLocation,
-                    items: locations.map((String location) {
-                      return DropdownMenuItem<String>(value: location, child: Text(location));
-                    }).toList(),
-                    onChanged: (String? newValue) {
-                      if (newValue != null) setState(() { _storageLocation = newValue; });
-                    },
+                    items: locations.map((String location) => DropdownMenuItem(value: location, child: Text(location))).toList(),
+                    onChanged: (String? newValue) { if (newValue != null) setState(() => _storageLocation = newValue); },
                     dropdownColor: Theme.of(context).cardColor,
                   ),
                   const SizedBox(height: 16),
@@ -308,6 +353,13 @@ class _InventoryEntryScreenState extends State<InventoryEntryScreen> {
                     ),
                   ),
                   const SizedBox(height: 24),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12.0),
+                    child: Text(
+                      'AI Context: Temp=${simulatedAvgTemp}°C, Holiday=${simulatedIsHoliday == 1 ? 'Yes' : 'No'}, Encoded SKU=${simulatedSkuEncoded}',
+                      style: const TextStyle(color: Colors.grey, fontStyle: FontStyle.italic, fontSize: 12),
+                    ),
+                  ),
                   _isLoading
                       ? const Center(child: CircularProgressIndicator())
                       : ElevatedButton.icon(
@@ -331,11 +383,13 @@ class _InventoryEntryScreenState extends State<InventoryEntryScreen> {
   }
 }
 
-// --- ALERTS SCREEN ---
+// --- ALERTS & DISCOUNTS SCREEN ---
 class AlertsDiscountsScreen extends StatefulWidget {
   final ApiService apiService;
   final VoidCallback refreshHome;
+
   const AlertsDiscountsScreen({super.key, required this.apiService, required this.refreshHome});
+
   @override
   State<AlertsDiscountsScreen> createState() => _AlertsDiscountsScreenState();
 }
@@ -365,6 +419,7 @@ class _AlertsDiscountsScreenState extends State<AlertsDiscountsScreen> {
           ));
         } catch (e) {
           processedProducts.add(product);
+          print('Error calculating discount for ${product.productName}: $e');
         }
       } else {
         processedProducts.add(product);
@@ -382,24 +437,20 @@ class _AlertsDiscountsScreenState extends State<AlertsDiscountsScreen> {
         if (snapshot.hasError) return Center(child: Text('Connection Error: ${snapshot.error}'));
         if (!snapshot.hasData || snapshot.data!.isEmpty) return const Center(child: Text('No inventory items found.'));
 
-        final alertProducts = snapshot.data!
-            .where((p) => p.daysToExpiry > 0 && p.daysToExpiry <= firstAlertDays && p.status != 'Donated')
-            .toList();
+        final alertProducts = snapshot.data!.where((p) => p.daysToExpiry > 0 && p.daysToExpiry <= firstAlertDays && p.status != 'Donated').toList();
 
         return RefreshIndicator(
           onRefresh: () async {
-            setState(() { _productsFuture = _fetchProductsAndCheckAlerts(); });
+            setState(() {
+              _productsFuture = _fetchProductsAndCheckAlerts();
+            });
           },
           child: ListView(
             padding: const EdgeInsets.all(16.0),
             children: [
-              Text(
-                'First Alert: Dynamic Discounting',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary),
-              ),
+              Text('First Alert: Dynamic Discounting', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
               const Divider(),
-              if (alertProducts.isEmpty)
-                const Center(child: Padding(padding: EdgeInsets.all(40.0), child: Text('No active alerts.', style: TextStyle(color: Colors.grey)))),
+              if (alertProducts.isEmpty) const Center(child: Padding(padding: EdgeInsets.all(40.0), child: Text('No items triggering alerts.', style: TextStyle(fontSize: 16, color: Colors.grey)))),
               ...alertProducts.map((product) {
                 final isDonationAlert = product.daysToExpiry <= secondAlertDays;
                 return DiscountAlertCard(key: ValueKey(product.id), product: product, isDonationAlert: isDonationAlert, apiService: widget.apiService);
@@ -416,7 +467,9 @@ class DiscountAlertCard extends StatefulWidget {
   final Product product;
   final bool isDonationAlert;
   final ApiService apiService;
+
   const DiscountAlertCard({super.key, required this.product, required this.isDonationAlert, required this.apiService});
+
   @override
   State<DiscountAlertCard> createState() => _DiscountAlertCardState();
 }
@@ -432,14 +485,14 @@ class _DiscountAlertCardState extends State<DiscountAlertCard> {
   }
 
   Future<void> _fetchRecipe() async {
-    setState(() { _isLoadingRecipe = true; });
+    setState(() { _isLoadingRecipe = true; _recipeSuggestion = 'Fetching AI Recipe...'; });
     try {
       final recipe = await widget.apiService.getRecipeSuggestion(widget.product.productName);
-      if(mounted) setState(() { _recipeSuggestion = recipe; });
+      setState(() => _recipeSuggestion = recipe);
     } catch (e) {
-      if(mounted) setState(() { _recipeSuggestion = 'Error fetching recipe'; });
+      setState(() => _recipeSuggestion = 'Error fetching recipe');
     } finally {
-      if(mounted) setState(() { _isLoadingRecipe = false; });
+      setState(() => _isLoadingRecipe = false);
     }
   }
 
@@ -457,34 +510,39 @@ class _DiscountAlertCardState extends State<DiscountAlertCard> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Expanded(child: Text(widget.product.productName, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold))),
-                Chip(
-                  label: Text('${widget.product.daysToExpiry} days left', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
-                  backgroundColor: widget.isDonationAlert ? Colors.red : Colors.orange,
-                ),
+                Expanded(child: Text(widget.product.productName, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
+                Chip(label: Text('${widget.product.daysToExpiry} days left', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)), backgroundColor: widget.isDonationAlert ? Colors.red : Colors.orange),
               ],
             ),
+            const Divider(height: 10),
+            Text('Location: ${widget.product.storageLocation} | Qty: ${widget.product.quantity}'),
             const SizedBox(height: 8),
-            Text('Qty: ${widget.product.quantity} | Loc: ${widget.product.storageLocation}'),
-            const SizedBox(height: 8),
+            Text('AI Dynamic Pricing', style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
             Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
               spacing: 10,
               children: [
-                Text('\$${widget.product.initialPrice.toStringAsFixed(2)}', style: const TextStyle(decoration: TextDecoration.lineThrough)),
-                Text('\$${widget.product.finalPrice.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.lightGreen, fontSize: 16)),
+                Text('Original: \$${widget.product.initialPrice.toStringAsFixed(2)}', style: const TextStyle(decoration: TextDecoration.lineThrough)),
+                Text('AI Price: \$${widget.product.finalPrice.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.lightGreen, fontSize: 16)),
                 Text('(${widget.product.discountPercentage.toStringAsFixed(0)}% OFF)', style: const TextStyle(color: Colors.red)),
               ],
             ),
             const SizedBox(height: 12),
             ExpansionTile(
-              title: const Text('Customer Preview (QR)', style: TextStyle(fontWeight: FontWeight.w600)),
-              children: [
+              title: const Text('Real-Time Customer Interface Preview', style: TextStyle(fontWeight: FontWeight.w600)),
+              children: <Widget>[
                 Padding(
                   padding: const EdgeInsets.all(8.0),
-                  child: Text(_recipeSuggestion, style: const TextStyle(fontStyle: FontStyle.italic)),
-                )
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('QR Code Recipe:', style: TextStyle(fontStyle: FontStyle.italic)),
+                      _isLoadingRecipe ? const LinearProgressIndicator() : Text(_recipeSuggestion, style: Theme.of(context).textTheme.bodyMedium),
+                    ],
+                  ),
+                ),
               ],
-            )
+            ),
           ],
         ),
       ),
@@ -497,94 +555,83 @@ class DonationScreen extends StatefulWidget {
   final ApiService apiService;
   final VoidCallback refreshHome;
   const DonationScreen({super.key, required this.apiService, required this.refreshHome});
+
   @override
   State<DonationScreen> createState() => _DonationScreenState();
 }
 
 class _DonationScreenState extends State<DonationScreen> {
-  late Future<List<Product>> _productsFuture;
-  final int donationThresholdDays = 4;
-  @override
-  void initState() {
-    super.initState();
-    _productsFuture = widget.apiService.fetchProducts();
-  }
-
-  Future<void> _markAsDonated(String id, String productName) async {
-    try {
-      await widget.apiService.deleteProduct(id);
-      widget.refreshHome();
-      if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Donation logged: $productName')));
-    } catch (e) {
-      if(mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to log donation')));
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<List<Product>>(
-      future: _productsFuture,
-      builder: (context, snapshot) {
+      future: widget.apiService.fetchProducts(),
+      builder: (ctx, snapshot) {
         if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-        final donationCandidates = snapshot.data!
-            .where((p) => p.daysToExpiry > 0 && p.daysToExpiry <= donationThresholdDays && p.status != 'Donated')
-            .toList();
+        
+        // Logic: Expiry <= 4 days
+        final donations = snapshot.data!.where((p) => p.daysToExpiry <= 4 && p.daysToExpiry > 0 && p.status != 'Donated').toList();
 
-        if (donationCandidates.isEmpty) return const Center(child: Text("No Donations Needed"));
+        if (donations.isEmpty) return const Center(child: Text("No Donations Needed", style: TextStyle(color: Colors.grey)));
 
-        return RefreshIndicator(
-          onRefresh: () async { setState(() { _productsFuture = widget.apiService.fetchProducts(); }); },
-          child: ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: donationCandidates.length,
-            itemBuilder: (ctx, i) {
-              final product = donationCandidates[i];
-              return Card(
-                color: Theme.of(context).cardColor,
-                child: ListTile(
-                  leading: Icon(Icons.warning, color: Colors.red.shade400),
-                  title: Text(product.productName, style: TextStyle(color: Colors.red.shade200)),
-                  subtitle: Text('Expires in ${product.daysToExpiry} days'),
-                  trailing: ElevatedButton(
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                    onPressed: product.id == null ? null : () => _markAsDonated(product.id!, product.productName),
-                    child: const Text("Log Donation", style: TextStyle(color: Colors.white)),
-                  ),
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: donations.length,
+          itemBuilder: (ctx, i) {
+            final p = donations[i];
+            return Card(
+              color: const Color(0xFF2A1515),
+              margin: const EdgeInsets.only(bottom: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: Colors.red.withOpacity(0.5))),
+              child: ListTile(
+                leading: const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 32),
+                title: Text(p.productName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                subtitle: Text('Expires in ${p.daysToExpiry} days', style: const TextStyle(color: Colors.redAccent)),
+                trailing: ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+                  child: const Text('Log Donation'),
+                  onPressed: () async {
+                    await widget.apiService.deleteProduct(p.id ?? '');
+                    setState((){}); // Refresh local
+                    if(mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Donation Logged")));
+                  },
                 ),
-              );
-            },
-          ),
+              ),
+            );
+          },
         );
       },
     );
   }
 }
 
-// --- BARCODE SCANNER MOCK ---
-class BarcodeScannerMock extends StatelessWidget {
+// --- MOCK BARCODE SCANNER SCREEN ---
+class BarcodeScannerScreen extends StatelessWidget {
   final Function(Map<String, dynamic>) onScanCompleted;
-  const BarcodeScannerMock({super.key, required this.onScanCompleted});
+  const BarcodeScannerScreen({super.key, required this.onScanCompleted});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
+      appBar: AppBar(title: const Text('Simulate Scanner')),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.qr_code_scanner, size: 80, color: Colors.green),
+            const Icon(Icons.qr_code_scanner, size: 100, color: Colors.green),
             const SizedBox(height: 20),
-            const Text("Simulating Camera Scan...", style: TextStyle(color: Colors.white)),
+            const Text("Simulating Scan...", style: TextStyle(color: Colors.white, fontSize: 20)),
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: () => onScanCompleted({
-                'productName': 'Scanned Item',
-                'productSku': 'SCAN-1234',
-                'initialPrice': 3.50,
-                'quantity': 5,
-                'expiryDays': 60
+                'productName': 'Scanned Soda',
+                'productSku': 'SODA-123',
+                'initialPrice': 2.50,
+                'quantity': 10,
+                'expiryDays': 60,
+                'storageLocation': 'Fridge B'
               }),
-              child: const Text("Capture"),
+              child: const Text("Capture 'Soda'"),
             )
           ],
         ),
