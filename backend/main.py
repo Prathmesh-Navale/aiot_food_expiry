@@ -7,6 +7,7 @@ from pymongo import MongoClient
 from prophet import Prophet 
 from datetime import datetime, timedelta
 import os
+from flask import request
 
 app = Flask(__name__)
 CORS(app)
@@ -217,6 +218,33 @@ def get_forecast():
 
     except Exception as e:
         print(f"Forecast Error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/products', methods=['POST'])
+def add_product():
+    try:
+        data = request.json
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+
+        # Optional: Add timestamps if not provided
+        if 'date_received' not in data:
+            data['date_received'] = datetime.now().isoformat()
+            
+        client = MongoClient(MONGO_URI)
+        collection = client[DB_NAME][INVENTORY_COLLECTION]
+        
+        # Insert into MongoDB
+        result = collection.insert_one(data)
+        
+        return jsonify({
+            "message": "Product added successfully", 
+            "id": str(result.inserted_id)
+        }), 201
+        
+    except Exception as e:
+        print(f"Error adding product: {e}")
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
