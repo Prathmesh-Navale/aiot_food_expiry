@@ -20,7 +20,7 @@ class ApiService {
   final http.Client client = http.Client();
 
   // CHANGED: Set default URL to your Live Render Backend
-  ApiService({this.baseUrl = "https://aiot-food-expiry.onrender.com/api"}); 
+  ApiService({this.baseUrl = "https://aiot-food-expiry.onrender.com"}); 
   // Note: I added "/api" at the end because your backend routes usually look like /api/discounts
   // IF your backend routes are just /products, remove "/api". 
   // Based on your previous Python code, your routes are '/api/discounts', so let's be careful.
