@@ -218,20 +218,6 @@ def get_forecast():
     except Exception as e:
         print(f"Forecast Error: {e}")
         return jsonify({"error": str(e)}), 500
-    
-# ==========================================
-# 4. HOMEPAGE (To fix the 404 Error)
-# ==========================================
-@app.route('/')
-def home():
-    return jsonify({
-        "status": "Running",
-        "message": "AIOT Food Expiry System is Live!",
-        "endpoints": [
-            "/api/discounts",
-            "/api/forecast"
-        ]
-    })
 
 if __name__ == '__main__':
     # Use the PORT environment variable if available (Render sets this)
