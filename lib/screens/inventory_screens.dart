@@ -1,5 +1,4 @@
 // lib/screens/inventory_screens.dart
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -7,31 +6,6 @@ import '../services/api_service.dart';
 import '../models/product.dart';
 
 // --- UTILITY WIDGETS ---
-
-class PlaceholderScreen extends StatelessWidget {
-  final String title;
-  const PlaceholderScreen({super.key, required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.construction, size: 60, color: Theme.of(context).colorScheme.primary),
-            const SizedBox(height: 20),
-            Text('Development In Progress for $title', style: Theme.of(context).textTheme.headlineSmall),
-            const SizedBox(height: 10),
-            Text('This module will provide specific functions for $title.', style: Theme.of(context).textTheme.bodyMedium),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class OptionButton extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -40,12 +14,8 @@ class OptionButton extends StatelessWidget {
   final VoidCallback onPressed;
 
   const OptionButton({
-    required this.icon,
-    required this.label,
-    required this.description,
-    required this.color,
-    required this.onPressed,
-    super.key,
+    required this.icon, required this.label, required this.description,
+    required this.color, required this.onPressed, super.key,
   });
 
   @override
@@ -56,8 +26,7 @@ class OptionButton extends StatelessWidget {
       child: ElevatedButton(
         onPressed: onPressed,
         style: ElevatedButton.styleFrom(
-          backgroundColor: color,
-          foregroundColor: Colors.black,
+          backgroundColor: color, foregroundColor: Colors.black,
           padding: const EdgeInsets.all(20),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
           elevation: 8,
@@ -104,7 +73,7 @@ class StockEntryOptionsScreen extends StatelessWidget {
                   builder: (context) => InventoryEntryScreen(
                     apiService: apiService,
                     onProductAdded: onProductAdded,
-                    initialData: scannedData, 
+                    initialData: scannedData,
                   )
               ),
             );
@@ -240,9 +209,7 @@ class _InventoryEntryScreenState extends State<InventoryEntryScreen> {
       lastDate: DateTime(2030),
     );
     if (picked != null && picked != _expiryDate) {
-      setState(() {
-        _expiryDate = picked;
-      });
+      setState(() => _expiryDate = picked!);
     }
   }
 
@@ -310,7 +277,7 @@ class _InventoryEntryScreenState extends State<InventoryEntryScreen> {
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _productSkuController,
-                    decoration: const InputDecoration(labelText: 'SKU / Barcode', prefixIcon: Icon(Icons.qr_code)),
+                    decoration: const InputDecoration(labelText: 'SKU / Barcode (e.g., COLA-330-001)', prefixIcon: Icon(Icons.qr_code)),
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
@@ -435,7 +402,7 @@ class _AlertsDiscountsScreenState extends State<AlertsDiscountsScreen> {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
         if (snapshot.hasError) return Center(child: Text('Connection Error: ${snapshot.error}'));
-        if (!snapshot.hasData || snapshot.data!.isEmpty) return const Center(child: Text('No inventory items found.'));
+        if (!snapshot.hasData || snapshot.data!.isEmpty) return const Center(child: Text('No inventory items found. Add stock via Stock Entry.'));
 
         final alertProducts = snapshot.data!.where((p) => p.daysToExpiry > 0 && p.daysToExpiry <= firstAlertDays && p.status != 'Donated').toList();
 
@@ -448,9 +415,13 @@ class _AlertsDiscountsScreenState extends State<AlertsDiscountsScreen> {
           child: ListView(
             padding: const EdgeInsets.all(16.0),
             children: [
-              Text('First Alert: Dynamic Discounting', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
+              Text(
+                'First Alert: Dynamic Discounting for Revenue Recovery',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary),
+              ),
+              const Padding(padding: EdgeInsets.symmetric(vertical: 8.0), child: Text('Items approaching expiry (10 days or less). AI determines the optimal discount to drive sales.')),
               const Divider(),
-              if (alertProducts.isEmpty) const Center(child: Padding(padding: EdgeInsets.all(40.0), child: Text('No items triggering alerts.', style: TextStyle(fontSize: 16, color: Colors.grey)))),
+              if (alertProducts.isEmpty) const Center(child: Padding(padding: EdgeInsets.all(40.0), child: Text('No items currently triggering the 10-day discount alert.', style: TextStyle(fontSize: 16, color: Colors.grey)))),
               ...alertProducts.map((product) {
                 final isDonationAlert = product.daysToExpiry <= secondAlertDays;
                 return DiscountAlertCard(key: ValueKey(product.id), product: product, isDonationAlert: isDonationAlert, apiService: widget.apiService);
@@ -529,20 +500,27 @@ class _DiscountAlertCardState extends State<DiscountAlertCard> {
             ),
             const SizedBox(height: 12),
             ExpansionTile(
-              title: const Text('Real-Time Customer Interface Preview', style: TextStyle(fontWeight: FontWeight.w600)),
+              title: const Text('Real-Time Customer Interface Preview (LCD/QR)', style: TextStyle(fontWeight: FontWeight.w600)),
+              collapsedBackgroundColor: Theme.of(context).cardColor,
+              backgroundColor: Theme.of(context).cardColor,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               children: <Widget>[
                 Padding(
-                  padding: const EdgeInsets.all(8.0),
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('QR Code Recipe:', style: TextStyle(fontStyle: FontStyle.italic)),
+                      Text('LCD Display: ${widget.product.productName} - ${widget.product.discountPercentage.toStringAsFixed(0)}% OFF!', style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.secondary)),
+                      const SizedBox(height: 8),
+                      const Text('QR Code Recipe: "This food is expiring soon—make this recipe for tonight\'s dinner!"', style: TextStyle(fontStyle: FontStyle.italic)),
+                      const SizedBox(height: 4),
                       _isLoadingRecipe ? const LinearProgressIndicator() : Text(_recipeSuggestion, style: Theme.of(context).textTheme.bodyMedium),
                     ],
                   ),
                 ),
               ],
             ),
+            if (widget.isDonationAlert) Padding(padding: const EdgeInsets.only(top: 12.0), child: Text('Action Required: Item is within 4 days of expiry and should be moved to the Donation Dashboard.', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red[400]))),
           ],
         ),
       ),
@@ -561,50 +539,87 @@ class DonationScreen extends StatefulWidget {
 }
 
 class _DonationScreenState extends State<DonationScreen> {
+  late Future<List<Product>> _productsFuture;
+  final int donationThresholdDays = 4;
+
+  @override
+  void initState() {
+    super.initState();
+    _productsFuture = widget.apiService.fetchProducts();
+  }
+
+  Future<void> _markAsDonated(String id, String productName) async {
+    try {
+      await widget.apiService.deleteProduct(id);
+      widget.refreshHome();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Successfully logged donation and removed: $productName.')));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to log donation (API Error): ${e.toString()}')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<List<Product>>(
       future: widget.apiService.fetchProducts(),
-      builder: (ctx, snapshot) {
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-        
-        // Logic: Expiry <= 4 days
-        final donations = snapshot.data!.where((p) => p.daysToExpiry <= 4 && p.daysToExpiry > 0 && p.status != 'Donated').toList();
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+        if (snapshot.hasError) return Center(child: Text('Connection Error: ${snapshot.error}'));
+        if (!snapshot.hasData) return const Center(child: Text('No Data'));
 
-        if (donations.isEmpty) return const Center(child: Text("No Donations Needed", style: TextStyle(color: Colors.grey)));
+        final donationCandidates = snapshot.data!.where((p) => p.daysToExpiry > 0 && p.daysToExpiry <= donationThresholdDays && p.status != 'Donated').toList();
 
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: donations.length,
-          itemBuilder: (ctx, i) {
-            final p = donations[i];
-            return Card(
-              color: const Color(0xFF2A1515),
-              margin: const EdgeInsets.only(bottom: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: Colors.red.withOpacity(0.5))),
-              child: ListTile(
-                leading: const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 32),
-                title: Text(p.productName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                subtitle: Text('Expires in ${p.daysToExpiry} days', style: const TextStyle(color: Colors.redAccent)),
-                trailing: ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
-                  child: const Text('Log Donation'),
-                  onPressed: () async {
-                    await widget.apiService.deleteProduct(p.id ?? '');
-                    setState((){}); // Refresh local
-                    if(mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Donation Logged")));
-                  },
-                ),
-              ),
-            );
+        return RefreshIndicator(
+          onRefresh: () async {
+            setState(() {
+              _productsFuture = widget.apiService.fetchProducts();
+            });
           },
+          child: ListView(
+            padding: const EdgeInsets.all(16.0),
+            children: [
+              Text('Second Alert: Donation and Final Sale Strategy', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: Colors.red[400])),
+              const Padding(padding: EdgeInsets.symmetric(vertical: 8.0), child: Text('Items expiring in **4 days or less**. AI suggests a split between final, deep-discount sale and necessary donation.')),
+              const Divider(),
+              if (donationCandidates.isEmpty) const Padding(padding: EdgeInsets.only(top: 50.0), child: Center(child: Column(children: [Icon(Icons.check_circle_outline, size: 80, color: Colors.lightGreen), SizedBox(height: 16), Text('All donation candidates have been cleared or are not yet critical.', style: TextStyle(fontSize: 16))]))),
+              ...donationCandidates.map((product) {
+                return DonationCandidateCard(product: product, onDonate: _markAsDonated);
+              }).toList(),
+            ],
+          ),
         );
       },
     );
   }
 }
 
-// --- MOCK BARCODE SCANNER SCREEN ---
+class DonationCandidateCard extends StatelessWidget {
+  final Product product;
+  final Function(String, String) onDonate;
+  const DonationCandidateCard({required this.product, required this.onDonate, super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 2,
+      margin: const EdgeInsets.only(bottom: 12),
+      color: Theme.of(context).cardColor,
+      child: ListTile(
+        leading: Icon(Icons.warning, color: Colors.red.shade400, size: 30),
+        title: Text('${product.productName} (Qty: ${product.quantity})', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red.shade200)),
+        subtitle: Text('Expiring in ${product.daysToExpiry} days | Location: ${product.storageLocation}'),
+        trailing: ElevatedButton.icon(
+          icon: const Icon(Icons.thumb_up),
+          label: const Text('Log Donation'),
+          onPressed: product.id == null ? null : () => onDonate(product.id!, product.productName),
+          style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.black),
+        ),
+      ),
+    );
+  }
+}
+
+// --- MISSING STUB: BARCODE SCANNER ---
 class BarcodeScannerScreen extends StatelessWidget {
   final Function(Map<String, dynamic>) onScanCompleted;
   const BarcodeScannerScreen({super.key, required this.onScanCompleted});

@@ -10,7 +10,7 @@ class Product {
   final double finalPrice;
   final String status;
 
-  // --- NEW FIELDS ---
+  // --- AI Context Fields ---
   final String productSku;
   final int skuEncoded;
   final double avgTemp;

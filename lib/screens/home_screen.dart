@@ -1,5 +1,4 @@
 // lib/screens/home_screen.dart
-
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../models/product.dart';
@@ -84,6 +83,8 @@ class _HomeScreenState extends State<HomeScreen> {
         _currentTitle = _menuItems.firstWhere((item) => item['index'] == index)['title'] as String;
       });
       if (Scaffold.of(context).hasDrawer && Scaffold.of(context).isDrawerOpen) Navigator.pop(context);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Debug: Could not find page for '$route'"), backgroundColor: Colors.red));
     }
   }
 
@@ -117,7 +118,10 @@ class _HomeScreenState extends State<HomeScreen> {
       floatingActionButton: FloatingActionButton(
         onPressed: _toggleChat,
         backgroundColor: _isChatOpen ? Colors.red.shade400 : Theme.of(context).colorScheme.primary,
+        elevation: 8,
+        shape: const CircleBorder(),
         child: Icon(_isChatOpen ? Icons.close : Icons.smart_toy, color: Colors.black, size: 30),
+        tooltip: _isChatOpen ? 'Close Foody-AI' : 'Open Foody-AI Chatbot',
       ),
     );
   }
@@ -141,15 +145,42 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
             ),
-            ..._menuItems.map((item) => ListTile(
-              leading: Icon(item['icon'] as IconData, color: Colors.white70),
-              title: Text(item['title'] as String, style: const TextStyle(color: Colors.white)),
-              onTap: () {
-                Navigator.pop(context);
-                _onNavigate(item['route'] as String, item['title'] as String);
-              },
-            )),
+            const Padding(padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0), child: Text('CORE OPERATIONS', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold))),
+            ..._menuItems.sublist(0, 6).map((item) => _buildDrawerTile(item['icon'] as IconData, item['title'] as String, item['route'] as String)),
+            const Divider(color: Colors.grey),
+            const Padding(padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0), child: Text('ACCOUNT & SUPPORT', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold))),
+            ..._menuItems.sublist(6).map((item) => _buildDrawerTile(item['icon'] as IconData, item['title'] as String, item['route'] as String)),
+            const Divider(color: Colors.grey),
+            ListTile(
+              leading: const Icon(Icons.logout, color: Colors.red),
+              title: const Text('Logout', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600)),
+              onTap: () => Navigator.pushReplacementNamed(context, '/login'),
+            ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDrawerTile(IconData icon, String title, String route) {
+    final itemIndex = _menuItems.indexWhere((item) => item['route'] == route);
+    final bool isSelected = _currentIndex == itemIndex;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: ListTile(
+          hoverColor: Colors.white.withOpacity(0.08),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          leading: Icon(icon, color: isSelected ? Theme.of(context).colorScheme.primary : Colors.white70),
+          title: Text(title, style: TextStyle(fontWeight: isSelected ? FontWeight.bold : FontWeight.normal, color: isSelected ? Theme.of(context).colorScheme.primary : Colors.white)),
+          selected: isSelected,
+          selectedTileColor: Theme.of(context).colorScheme.primary.withOpacity(0.15),
+          onTap: () {
+            Navigator.pop(context);
+            _onNavigate(route, title);
+          },
         ),
       ),
     );
@@ -170,17 +201,9 @@ class MainDashboardScreenStub extends StatelessWidget {
         children: [
           const Text("Store Overview", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
           const SizedBox(height: 16),
-          // Simplified Dashboard UI
-          Container(
-            padding: const EdgeInsets.all(20),
-            color: Colors.white10,
-            child: const Text("Dashboard Statistics Loaded Here", style: TextStyle(color: Colors.white)),
-          ),
+          Container(padding: const EdgeInsets.all(20), color: Colors.white10, child: const Text("Dashboard Statistics Loaded Here", style: TextStyle(color: Colors.white))),
           const SizedBox(height: 20),
-          ElevatedButton(
-             onPressed: () => onNavigate('/stock-options', 'Stock Entry'),
-             child: const Text("Add Stock"),
-          )
+          ElevatedButton(onPressed: () => onNavigate('/stock-options', 'Stock Entry'), child: const Text("Add Stock")),
         ],
       ),
     );
@@ -200,23 +223,30 @@ class ChatbotStub extends StatelessWidget {
   final ApiService apiService;
   final VoidCallback onClose;
   const ChatbotStub({super.key, required this.apiService, required this.onClose});
-
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 300,
-      height: 400,
+      width: 300, height: 400,
       decoration: BoxDecoration(color: Colors.grey[900], borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.green)),
       child: Column(
         children: [
           AppBar(title: const Text("Foody-AI"), automaticallyImplyLeading: false, backgroundColor: Colors.transparent, actions: [IconButton(icon: const Icon(Icons.close), onPressed: onClose)]),
           const Expanded(child: Center(child: Text("Ask me about stock...", style: TextStyle(color: Colors.white)))),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: TextField(decoration: InputDecoration(hintText: "Type a message...", filled: true, fillColor: Colors.black, border: OutlineInputBorder(borderRadius: BorderRadius.circular(20)))),
-          )
+          Padding(padding: const EdgeInsets.all(8.0), child: TextField(decoration: InputDecoration(hintText: "Type a message...", filled: true, fillColor: Colors.black, border: OutlineInputBorder(borderRadius: BorderRadius.circular(20))))),
         ],
       ),
+    );
+  }
+}
+
+class PlaceholderScreen extends StatelessWidget {
+  final String title;
+  const PlaceholderScreen({super.key, required this.title});
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(title)),
+      body: Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.construction, size: 80, color: Colors.grey[700]), const SizedBox(height: 16), Text("$title\nComing Soon!", textAlign: TextAlign.center, style: const TextStyle(fontSize: 20, color: Colors.grey)), const SizedBox(height: 20), ElevatedButton(onPressed: () => Navigator.pop(context), child: const Text("Go Back"))])),
     );
   }
 }

@@ -67,16 +67,17 @@ class AIoTInventoryApp extends StatelessWidget {
       routes: {
         '/login': (context) => const LoginScreenStub(),
         '/home': (context) {
-           // Simple argument handling
            return HomeScreen(apiService: apiService, storeName: 'My Store');
         },
         '/stock-options': (context) => StockEntryOptionsScreen(apiService: apiService, refreshHome: dummyRefresh, onProductAdded: dummyOnProductAdded),
         '/manual-entry': (context) => InventoryEntryScreen(apiService: apiService, onProductAdded: dummyOnProductAdded),
         '/alerts-discounts': (context) => AlertsDiscountsScreen(apiService: apiService, refreshHome: dummyRefresh),
         '/donation': (context) => DonationScreen(apiService: apiService, refreshHome: dummyRefresh),
+        '/productivity': (context) => const PlaceholderScreen(title: 'Productivity'),
         '/profile': (context) => const PlaceholderScreen(title: 'Store Profile'),
         '/contact': (context) => const PlaceholderScreen(title: 'Contact Us'),
         '/support': (context) => const PlaceholderScreen(title: 'Support Desk'),
+        '/chatbot': (context) => const PlaceholderScreen(title: 'AI Chatbot'),
       },
     );
   }
