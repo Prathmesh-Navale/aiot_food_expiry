@@ -1,4 +1,4 @@
-import 'dart:math';
+import 'dart:convert';
 
 class Product {
   final String? id;
@@ -11,7 +11,7 @@ class Product {
   final double finalPrice;
   final String status;
 
-  // --- NEW FIELDS ---
+  // --- AI Context Fields ---
   final String productSku;
   final int skuEncoded;
   final double avgTemp;
@@ -33,7 +33,7 @@ class Product {
     this.isHoliday = 0,
   });
 
-  // ✅ THIS IS THE METHOD THAT FIXES THE BUILD ERROR
+  // ✅ CRITICAL: This method is used by the UI to update local state
   Product copyProductWith({
     String? id,
     String? productName,
@@ -66,7 +66,6 @@ class Product {
     );
   }
 
-  // ✅ FACTORY: Maps Python Data to Flutter variables
   factory Product.fromJson(Map<String, dynamic> json) {
     T getValue<T>(dynamic val, T defaultValue) {
       if (val == null) return defaultValue;
