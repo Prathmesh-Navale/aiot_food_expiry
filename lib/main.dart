@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 // --- Local Imports ---
-import 'models/product.dart';
+import '../models/product.dart';
 import 'services/api_service.dart';
 
 // --- Screen Imports ---
