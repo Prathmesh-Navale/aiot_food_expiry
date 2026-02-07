@@ -33,8 +33,7 @@ class Product {
     this.isHoliday = 0,
   });
 
-  // ✅ THIS IS THE METHOD THAT WAS MISSING
-  // You need this for the "Inventory" screen to work!
+  // ✅ THIS IS THE METHOD THAT FIXES THE BUILD ERROR
   Product copyProductWith({
     String? id,
     String? productName,
@@ -67,9 +66,8 @@ class Product {
     );
   }
 
-  // ✅ FACTORY: This maps Python Data to Flutter variables
+  // ✅ FACTORY: Maps Python Data to Flutter variables
   factory Product.fromJson(Map<String, dynamic> json) {
-    // Helper to safely convert numbers (Int/Double/String) without crashing
     T getValue<T>(dynamic val, T defaultValue) {
       if (val == null) return defaultValue;
       if (val is T) return val;
@@ -80,7 +78,6 @@ class Product {
       return defaultValue;
     }
 
-    // 1. Handle Date Logic (Python sends 'remaining_life', not a date)
     DateTime parsedDate;
     if (json['expiry_date'] != null) {
       try {
@@ -95,7 +92,6 @@ class Product {
       parsedDate = DateTime.now().add(const Duration(days: 7));
     }
 
-    // 2. Handle ID safely
     final idValue = json['_id'];
     String? idString;
     if (idValue is Map && idValue.containsKey('\$oid')) {
@@ -133,11 +129,10 @@ class Product {
       'discount_percentage': discountPercentage,
     };
   }
-
+  
   int get daysToExpiry {
     final now = DateTime.now();
-    final date = DateTime(expiryDate.year, expiryDate.month, expiryDate.day);
-    final today = DateTime(now.year, now.month, now.day);
-    return date.difference(today).inDays;
+    return DateTime(expiryDate.year, expiryDate.month, expiryDate.day)
+        .difference(DateTime(now.year, now.month, now.day)).inDays;
   }
 }
