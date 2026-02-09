@@ -1,4 +1,7 @@
-// lib/models/product.dart
+//product.dart
+import 'dart:math';
+
+// --- CORE DATA MODEL ---
 class Product {
   final String? id;
   final String productName;
@@ -10,11 +13,17 @@ class Product {
   final double finalPrice;
   final String status;
 
-  // --- AI Context Fields ---
-  final String productSku;
-  final int skuEncoded;
-  final double avgTemp;
-  final int isHoliday;
+  // --- NEW FIELDS ---
+  final String productSku; // The human-readable SKU/Barcode
+  // ------------------
+
+  // --- AI MODEL FEATURES ---
+  final int skuEncoded; // Required for AI model input
+  // Removed: salesLast10d
+  final double avgTemp; // Required for AI model input (Simulated on frontend)
+  final int isHoliday; // Required for AI model input (Simulated on frontend)
+  // Note: initialPrice acts as full_retail_price
+  // -----------------------------
 
   Product({
     this.id,
@@ -26,12 +35,15 @@ class Product {
     this.discountPercentage = 0.0,
     this.finalPrice = 0.0,
     this.status = 'For Sale',
+
+    // Default/Simulated values for new fields
     this.productSku = '',
     this.skuEncoded = 1,
     this.avgTemp = 20.0,
     this.isHoliday = 0,
   });
 
+  // Method to create a new Product instance with updated fields
   Product copyProductWith({
     String? id,
     String? productName,
@@ -65,48 +77,34 @@ class Product {
   }
 
   factory Product.fromJson(Map<String, dynamic> json) {
-    T getValue<T>(dynamic val, T defaultValue) {
-      if (val == null) return defaultValue;
-      if (val is T) return val;
-      if (val is num && T == double) return val.toDouble() as T;
-      if (val is num && T == int) return val.toInt() as T;
-      if (val is String && T == double) return (double.tryParse(val) ?? defaultValue) as T;
-      if (val is String && T == int) return (int.tryParse(val) ?? defaultValue) as T;
-      return defaultValue;
-    }
-
     DateTime parsedDate;
-    if (json['expiry_date'] != null) {
-      try {
-        parsedDate = DateTime.parse(json['expiry_date'].toString().split('T')[0]);
-      } catch (_) {
-        parsedDate = DateTime.now().add(const Duration(days: 7));
-      }
-    } else if (json['remaining_life'] != null) {
-      int daysLeft = getValue<int>(json['remaining_life'], 0);
-      parsedDate = DateTime.now().add(Duration(days: daysLeft));
-    } else {
-      parsedDate = DateTime.now().add(const Duration(days: 7));
+    try {
+      parsedDate = DateTime.parse(json['expiry_date'].toString().split('T')[0]);
+    } catch (_) {
+      parsedDate = DateTime.now(); // Fallback date
     }
 
     final idValue = json['_id'];
-    String? idString;
-    if (idValue is Map && idValue.containsKey('\$oid')) {
-      idString = idValue['\$oid'];
-    } else if (idValue != null) {
-      idString = idValue.toString();
+    final idString = (idValue is Map) ? idValue['\$oid'] as String : idValue as String?;
+
+    T getValue<T>(dynamic val, T defaultValue) {
+      if (val is T) return val;
+      if (val is num && T == double) return (val as num).toDouble() as T;
+      if (val is num && T == int) return (val as num).toInt() as T;
+      return defaultValue;
     }
 
     return Product(
       id: idString,
-      productName: json['product_name'] ?? json['name'] ?? 'Unknown Product',
-      initialPrice: getValue<double>(json['marked_price'] ?? json['initial_price'], 0.0),
-      quantity: getValue<int>(json['current_stock'] ?? json['quantity'], 0),
+      productName: json['product_name'] ?? 'Unknown',
+      initialPrice: getValue<double>(json['initial_price'], 0.0),
+      quantity: getValue<int>(json['quantity'], 0),
       expiryDate: parsedDate,
-      storageLocation: json['storage_location'] ?? 'Shelf A',
-      discountPercentage: getValue<double>(json['final_discount_pct'] ?? json['discount_percentage'], 0.0),
-      finalPrice: getValue<double>(json['final_selling_price'] ?? json['final_price'], 0.0),
-      status: json['action_status'] ?? json['status'] ?? 'For Sale',
+      storageLocation: json['storage_location'] ?? 'Shelf',
+      discountPercentage: getValue<double>(json['discount_percentage'], 0.0),
+      finalPrice: getValue<double>(json['final_price'], 0.0),
+      status: json['status'] ?? 'For Sale',
+
       productSku: json['sku'] ?? '',
       skuEncoded: getValue<int>(json['sku_encoded'], 1),
       avgTemp: getValue<double>(json['avg_temp'], 20.0),
@@ -117,19 +115,20 @@ class Product {
   Map<String, dynamic> toJson() {
     return {
       'product_name': productName,
-      'marked_price': initialPrice,
-      'current_stock': quantity,
-      'expiry_date': expiryDate.toIso8601String(),
+      'initial_price': initialPrice,
+      'quantity': quantity,
+      'expiry_date': expiryDate.toIso8601String().substring(0, 10),
       'storage_location': storageLocation,
-      'sku': productSku,
-      'action_status': status,
       'discount_percentage': discountPercentage,
+      'final_price': finalPrice,
+      'status': status,
+
+      'sku': productSku,
+      'sku_encoded': skuEncoded,
+      'avg_temp': avgTemp,
+      'is_holiday': isHoliday,
     };
   }
-  
-  int get daysToExpiry {
-    final now = DateTime.now();
-    return DateTime(expiryDate.year, expiryDate.month, expiryDate.day)
-        .difference(DateTime(now.year, now.month, now.day)).inDays;
-  }
+
+  int get daysToExpiry => expiryDate.difference(DateTime.now().subtract(const Duration(hours: 24))).inDays;
 }

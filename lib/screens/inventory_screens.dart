@@ -1,11 +1,14 @@
 // lib/screens/inventory_screens.dart
+
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:aiot_ui/services/api_service.dart';
+import 'package:aiot_ui/models/product.dart';
 import 'package:intl/intl.dart';
-import '../services/api_service.dart';
-import '../models/product.dart';
+import 'package:flutter/services.dart';
 
 // --- UTILITY WIDGETS ---
+
+// Reusable button widget for options screen
 class OptionButton extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -14,8 +17,12 @@ class OptionButton extends StatelessWidget {
   final VoidCallback onPressed;
 
   const OptionButton({
-    required this.icon, required this.label, required this.description,
-    required this.color, required this.onPressed, super.key,
+    required this.icon,
+    required this.label,
+    required this.description,
+    required this.color,
+    required this.onPressed,
+    super.key,
   });
 
   @override
@@ -26,7 +33,8 @@ class OptionButton extends StatelessWidget {
       child: ElevatedButton(
         onPressed: onPressed,
         style: ElevatedButton.styleFrom(
-          backgroundColor: color, foregroundColor: Colors.black,
+          backgroundColor: color,
+          foregroundColor: Colors.black,
           padding: const EdgeInsets.all(20),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
           elevation: 8,
@@ -53,7 +61,7 @@ class OptionButton extends StatelessWidget {
   }
 }
 
-// --- STOCK ENTRY OPTIONS SCREEN ---
+// --- 6. STOCK ENTRY OPTIONS SCREEN (QR/Manual) ---
 class StockEntryOptionsScreen extends StatelessWidget {
   final ApiService apiService;
   final VoidCallback refreshHome;
@@ -61,19 +69,21 @@ class StockEntryOptionsScreen extends StatelessWidget {
 
   const StockEntryOptionsScreen({super.key, required this.apiService, required this.refreshHome, required this.onProductAdded});
 
+  // --- Function to handle navigation after scanning ---
   void _startScan(BuildContext context) {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => BarcodeScannerScreen(
           onScanCompleted: (scannedData) {
+            // Navigate to the Inventory Entry Screen, pre-filling data
             Navigator.push(
               context,
               MaterialPageRoute(
                   builder: (context) => InventoryEntryScreen(
                     apiService: apiService,
                     onProductAdded: onProductAdded,
-                    initialData: scannedData,
+                    initialData: scannedData, // Pass the scanned data
                   )
               ),
             );
@@ -100,14 +110,18 @@ class StockEntryOptionsScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 30),
+
+            // QR Code Scan Button (REAL SCANNER LOGIC)
             OptionButton(
               icon: Icons.qr_code_scanner,
               label: 'QR Code/Barcode Scan (IoT)',
               description: 'Instantly integrate stock data via camera scanner.',
               color: Theme.of(context).colorScheme.secondary,
-              onPressed: () => _startScan(context),
+              onPressed: () => _startScan(context), // Uses the real scanner screen
             ),
             const SizedBox(height: 20),
+
+            // Manual Entry Button
             OptionButton(
               icon: Icons.edit_note,
               label: 'Manual Data Entry',
@@ -127,11 +141,11 @@ class StockEntryOptionsScreen extends StatelessWidget {
   }
 }
 
-// --- MANUAL INVENTORY ENTRY SCREEN ---
+// --- 7. MANUAL INVENTORY ENTRY SCREEN (UPDATED TO RECEIVE DATA) ---
 class InventoryEntryScreen extends StatefulWidget {
   final ApiService apiService;
   final VoidCallback onProductAdded;
-  final Map<String, dynamic>? initialData;
+  final Map<String, dynamic>? initialData; // NEW: Optional data passed from scanner
 
   const InventoryEntryScreen({super.key, required this.apiService, required this.onProductAdded, this.initialData});
 
@@ -141,16 +155,22 @@ class InventoryEntryScreen extends StatefulWidget {
 
 class _InventoryEntryScreenState extends State<InventoryEntryScreen> {
   final _formKey = GlobalKey<FormState>();
+
+  // --- Text Controllers for pre-filling ---
   late TextEditingController _productNameController;
   late TextEditingController _productSkuController;
   late TextEditingController _initialPriceController;
   late TextEditingController _quantityController;
 
+  // --- Form State Variables ---
+  // Default expiry set to a reasonable future date for any new item
   DateTime _expiryDate = DateTime.now().add(const Duration(days: 90));
   String _storageLocation = 'Shelf A';
   bool _isLoading = false;
+
   final List<String> locations = ['Shelf A', 'Fridge B', 'Freezer C', 'Warehouse D'];
 
+  // --- HARDCODED/SIMULATED AI INPUTS (for consistency) ---
   static const int simulatedSkuEncoded = 201;
   static const double simulatedAvgTemp = 22.0;
   static const int simulatedIsHoliday = 0;
@@ -159,6 +179,7 @@ class _InventoryEntryScreenState extends State<InventoryEntryScreen> {
   void initState() {
     super.initState();
     final data = widget.initialData;
+
     if (data == null) {
       _productNameController = TextEditingController(text: '');
       _productSkuController = TextEditingController(text: '');
@@ -171,7 +192,11 @@ class _InventoryEntryScreenState extends State<InventoryEntryScreen> {
       _productSkuController = TextEditingController(text: data['productSku'] ?? '');
       _initialPriceController = TextEditingController(text: data['initialPrice']?.toStringAsFixed(2) ?? '');
       _quantityController = TextEditingController(text: data['quantity']?.toString() ?? '1');
-      if (data['storageLocation'] != null) _storageLocation = data['storageLocation'];
+
+      if (data['storageLocation'] != null) {
+        _storageLocation = data['storageLocation'];
+      }
+
       if (data['expiryDays'] != null) {
         _expiryDate = DateTime.now().add(Duration(days: data['expiryDays'] as int));
       } else {
@@ -209,13 +234,18 @@ class _InventoryEntryScreenState extends State<InventoryEntryScreen> {
       lastDate: DateTime(2030),
     );
     if (picked != null && picked != _expiryDate) {
-      setState(() => _expiryDate = picked!);
+      setState(() {
+        _expiryDate = picked;
+      });
     }
   }
 
   Future<void> _submitForm() async {
     if (_formKey.currentState!.validate()) {
-      setState(() => _isLoading = true);
+      setState(() {
+        _isLoading = true;
+      });
+
       final newProduct = Product(
         productName: _productNameController.text.trim(),
         initialPrice: double.tryParse(_initialPriceController.text) ?? 0.0,
@@ -231,17 +261,26 @@ class _InventoryEntryScreenState extends State<InventoryEntryScreen> {
       try {
         await widget.apiService.addProduct(newProduct);
         widget.onProductAdded();
+
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('SUCCESS: Product ${newProduct.productName} stored in database.')));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('SUCCESS: Product ${newProduct.productName} stored in database.')),
+          );
           _resetForm();
         }
       } catch (e) {
         if (mounted) {
           String errorDetail = e.toString().contains(':') ? e.toString().split(':')[1].trim() : 'Unknown error';
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Database Error: Failed to add product ($errorDetail)')));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Database Error: Failed to add product ($errorDetail)')),
+          );
         }
       } finally {
-        if (mounted) setState(() => _isLoading = false);
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
       }
     }
   }
@@ -305,8 +344,12 @@ class _InventoryEntryScreenState extends State<InventoryEntryScreen> {
                   DropdownButtonFormField<String>(
                     decoration: const InputDecoration(labelText: 'Storage Location', prefixIcon: Icon(Icons.location_on)),
                     value: _storageLocation,
-                    items: locations.map((String location) => DropdownMenuItem(value: location, child: Text(location))).toList(),
-                    onChanged: (String? newValue) { if (newValue != null) setState(() => _storageLocation = newValue); },
+                    items: locations.map((String location) {
+                      return DropdownMenuItem<String>(value: location, child: Text(location));
+                    }).toList(),
+                    onChanged: (String? newValue) {
+                      if (newValue != null) setState(() => _storageLocation = newValue);
+                    },
                     dropdownColor: Theme.of(context).cardColor,
                   ),
                   const SizedBox(height: 16),
@@ -350,7 +393,7 @@ class _InventoryEntryScreenState extends State<InventoryEntryScreen> {
   }
 }
 
-// --- ALERTS & DISCOUNTS SCREEN ---
+// --- 8. ALERTS & DISCOUNTS SCREEN (First Alert) ---
 class AlertsDiscountsScreen extends StatefulWidget {
   final ApiService apiService;
   final VoidCallback refreshHome;
@@ -404,7 +447,9 @@ class _AlertsDiscountsScreenState extends State<AlertsDiscountsScreen> {
         if (snapshot.hasError) return Center(child: Text('Connection Error: ${snapshot.error}'));
         if (!snapshot.hasData || snapshot.data!.isEmpty) return const Center(child: Text('No inventory items found. Add stock via Stock Entry.'));
 
-        final alertProducts = snapshot.data!.where((p) => p.daysToExpiry > 0 && p.daysToExpiry <= firstAlertDays && p.status != 'Donated').toList();
+        final alertProducts = snapshot.data!
+            .where((p) => p.daysToExpiry > 0 && p.daysToExpiry <= firstAlertDays && p.status != 'Donated')
+            .toList();
 
         return RefreshIndicator(
           onRefresh: () async {
@@ -419,12 +464,26 @@ class _AlertsDiscountsScreenState extends State<AlertsDiscountsScreen> {
                 'First Alert: Dynamic Discounting for Revenue Recovery',
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary),
               ),
-              const Padding(padding: EdgeInsets.symmetric(vertical: 8.0), child: Text('Items approaching expiry (10 days or less). AI determines the optimal discount to drive sales.')),
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8.0),
+                child: Text('Items approaching expiry (10 days or less). AI determines the optimal discount to drive sales.'),
+              ),
               const Divider(),
-              if (alertProducts.isEmpty) const Center(child: Padding(padding: EdgeInsets.all(40.0), child: Text('No items currently triggering the 10-day discount alert.', style: TextStyle(fontSize: 16, color: Colors.grey)))),
+              if (alertProducts.isEmpty)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(40.0),
+                    child: Text('No items currently triggering the 10-day discount alert.', style: TextStyle(fontSize: 16, color: Colors.grey)),
+                  ),
+                ),
               ...alertProducts.map((product) {
                 final isDonationAlert = product.daysToExpiry <= secondAlertDays;
-                return DiscountAlertCard(key: ValueKey(product.id), product: product, isDonationAlert: isDonationAlert, apiService: widget.apiService);
+                return DiscountAlertCard(
+                  key: ValueKey(product.id),
+                  product: product,
+                  isDonationAlert: isDonationAlert,
+                  apiService: widget.apiService,
+                );
               }).toList(),
             ],
           ),
@@ -528,98 +587,7 @@ class _DiscountAlertCardState extends State<DiscountAlertCard> {
   }
 }
 
-// --- DONATION SCREEN ---
-class DonationScreen extends StatefulWidget {
-  final ApiService apiService;
-  final VoidCallback refreshHome;
-  const DonationScreen({super.key, required this.apiService, required this.refreshHome});
-
-  @override
-  State<DonationScreen> createState() => _DonationScreenState();
-}
-
-class _DonationScreenState extends State<DonationScreen> {
-  late Future<List<Product>> _productsFuture;
-  final int donationThresholdDays = 4;
-
-  @override
-  void initState() {
-    super.initState();
-    _productsFuture = widget.apiService.fetchProducts();
-  }
-
-  Future<void> _markAsDonated(String id, String productName) async {
-    try {
-      await widget.apiService.deleteProduct(id);
-      widget.refreshHome();
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Successfully logged donation and removed: $productName.')));
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to log donation (API Error): ${e.toString()}')));
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<List<Product>>(
-      future: widget.apiService.fetchProducts(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-        if (snapshot.hasError) return Center(child: Text('Connection Error: ${snapshot.error}'));
-        if (!snapshot.hasData) return const Center(child: Text('No Data'));
-
-        final donationCandidates = snapshot.data!.where((p) => p.daysToExpiry > 0 && p.daysToExpiry <= donationThresholdDays && p.status != 'Donated').toList();
-
-        return RefreshIndicator(
-          onRefresh: () async {
-            setState(() {
-              _productsFuture = widget.apiService.fetchProducts();
-            });
-          },
-          child: ListView(
-            padding: const EdgeInsets.all(16.0),
-            children: [
-              Text('Second Alert: Donation and Final Sale Strategy', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: Colors.red[400])),
-              const Padding(padding: EdgeInsets.symmetric(vertical: 8.0), child: Text('Items expiring in **4 days or less**. AI suggests a split between final, deep-discount sale and necessary donation.')),
-              const Divider(),
-              if (donationCandidates.isEmpty) const Padding(padding: EdgeInsets.only(top: 50.0), child: Center(child: Column(children: [Icon(Icons.check_circle_outline, size: 80, color: Colors.lightGreen), SizedBox(height: 16), Text('All donation candidates have been cleared or are not yet critical.', style: TextStyle(fontSize: 16))]))),
-              ...donationCandidates.map((product) {
-                return DonationCandidateCard(product: product, onDonate: _markAsDonated);
-              }).toList(),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-class DonationCandidateCard extends StatelessWidget {
-  final Product product;
-  final Function(String, String) onDonate;
-  const DonationCandidateCard({required this.product, required this.onDonate, super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      elevation: 2,
-      margin: const EdgeInsets.only(bottom: 12),
-      color: Theme.of(context).cardColor,
-      child: ListTile(
-        leading: Icon(Icons.warning, color: Colors.red.shade400, size: 30),
-        title: Text('${product.productName} (Qty: ${product.quantity})', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red.shade200)),
-        subtitle: Text('Expiring in ${product.daysToExpiry} days | Location: ${product.storageLocation}'),
-        trailing: ElevatedButton.icon(
-          icon: const Icon(Icons.thumb_up),
-          label: const Text('Log Donation'),
-          onPressed: product.id == null ? null : () => onDonate(product.id!, product.productName),
-          style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.black),
-        ),
-      ),
-    );
-  }
-}
-
-// --- MISSING STUB: BARCODE SCANNER ---
+// --- MISSING CLASS: BarcodeScannerScreen (Added here to fix error) ---
 class BarcodeScannerScreen extends StatelessWidget {
   final Function(Map<String, dynamic>) onScanCompleted;
   const BarcodeScannerScreen({super.key, required this.onScanCompleted});

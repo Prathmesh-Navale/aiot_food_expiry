@@ -1,8 +1,21 @@
 // lib/screens/home_screen.dart
+
 import 'package:flutter/material.dart';
-import '../services/api_service.dart';
-import '../models/product.dart';
-import 'inventory_screens.dart'; // Import Inventory, Donation, Alerts
+import 'package:aiot_ui/services/api_service.dart';
+
+// --- FIXED IMPORT ---
+// Import the fixed inventory file we just made. 
+// We DON'T hide DonationScreen here because we aren't using the conflicting one.
+import 'package:aiot_ui/screens/inventory_screens.dart';
+
+import 'package:aiot_ui/screens/dashboard/main_dashboard_screen.dart';
+import 'package:aiot_ui/screens/dashboard/sales_screens.dart'; 
+import 'package:flutter/services.dart';
+
+// Import modules you provided
+import 'dashboard/forecast_screen.dart'; 
+import 'donation_screen.dart'; 
+import 'dashboard/productivity_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final ApiService apiService;
@@ -17,7 +30,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
   String _currentTitle = 'Home Dashboard';
-  bool _isChatOpen = false;
+  bool _isChatOpen = false; 
 
   late List<Map<String, dynamic>> _menuItems;
   late List<Widget> _screens;
@@ -28,6 +41,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.didChangeDependencies();
     if (!_isInitialized) {
       _initializeScreens();
+      _currentTitle = _menuItems[_currentIndex]['title'] as String;
       _isInitialized = true;
     }
   }
@@ -51,15 +65,15 @@ class _HomeScreenState extends State<HomeScreen> {
     ];
 
     _screens = [
-      MainDashboardScreen(onNavigate: _onNavigate),
-      SalesDashboardScreen(apiService: widget.apiService, onNavigate: _onNavigate),
-      StockEntryOptionsScreen(apiService: widget.apiService, refreshHome: _forceRefresh, onProductAdded: dummyOnProductAdded),
-      AlertsDiscountsScreen(apiService: widget.apiService, refreshHome: _forceRefresh),
-      DonationScreen(apiService: widget.apiService, refreshHome: _forceRefresh),
-      const ProductivityManagementScreen(), // Placeholder for productivity
-      const PlaceholderScreen(title: 'Store Profile'),
-      const PlaceholderScreen(title: 'Contact Us'),
-      const PlaceholderScreen(title: 'Support Desk'),
+      MainDashboardScreen(onNavigate: _onNavigate), 
+      SalesDashboardScreen(apiService: widget.apiService, onNavigate: _onNavigate), 
+      StockEntryOptionsScreen(apiService: widget.apiService, refreshHome: _forceRefresh, onProductAdded: dummyOnProductAdded), 
+      AlertsDiscountsScreen(apiService: widget.apiService, refreshHome: _forceRefresh), 
+      DonationScreen(apiService: widget.apiService, refreshHome: _forceRefresh), 
+      const ForecastScreen(), 
+      const PlaceholderScreen(title: 'Store Profile'), 
+      const PlaceholderScreen(title: 'Contact Us'), 
+      const PlaceholderScreen(title: 'Support Desk'), 
     ];
   }
 
@@ -70,7 +84,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (cleanRoute.contains('dashboard') && !cleanRoute.contains('sale') || cleanRoute == '/') index = 0;
     else if (cleanRoute.contains('sale')) index = 1;
     else if (cleanRoute.contains('stock') || cleanRoute.contains('scan')) index = 2;
-    else if (cleanRoute.contains('discount') || cleanRoute.contains('alert')) index = 3;
+    else if (cleanRoute.contains('discount') || cleanRoute.contains('alert')) index = 3; 
     else if (cleanRoute.contains('donation')) index = 4;
     else if (cleanRoute.contains('productiv') || cleanRoute.contains('forecast')) index = 5;
     else if (cleanRoute.contains('profile')) index = 6;
@@ -82,35 +96,58 @@ class _HomeScreenState extends State<HomeScreen> {
         _currentIndex = index;
         _currentTitle = _menuItems.firstWhere((item) => item['index'] == index)['title'] as String;
       });
-      if (Scaffold.of(context).hasDrawer && Scaffold.of(context).isDrawerOpen) Navigator.pop(context);
+      if (Scaffold.of(context).hasDrawer && Scaffold.of(context).isDrawerOpen) {
+        Navigator.pop(context);
+      }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Debug: Could not find page for '$route'"), backgroundColor: Colors.red));
     }
   }
 
-  void _goToDashboard() => _onNavigate('/main-dashboard', 'Home Dashboard');
-  void _forceRefresh() => setState(() {});
-  void _toggleChat() => setState(() => _isChatOpen = !_isChatOpen);
+  void _goToDashboard() {
+    _onNavigate('/main-dashboard', 'Home Dashboard');
+  }
+
+  void _forceRefresh() {
+    setState(() {});
+  }
+
+  void _toggleChat() {
+    setState(() {
+      _isChatOpen = !_isChatOpen;
+    });
+  }
+
+  Widget _buildScreen() {
+    if (!_isInitialized) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    return IndexedStack(index: _currentIndex, children: _screens);
+  }
 
   @override
   Widget build(BuildContext context) {
     final bool isDashboard = _currentIndex == 0;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(_currentTitle),
         backgroundColor: Theme.of(context).cardColor,
         leading: isDashboard
-            ? Builder(builder: (ctx) => IconButton(icon: const Icon(Icons.menu), onPressed: () => Scaffold.of(ctx).openDrawer()))
+            ? Builder(builder: (context) {
+          return IconButton(icon: const Icon(Icons.menu), onPressed: () => Scaffold.of(context).openDrawer());
+        })
             : IconButton(icon: const Icon(Icons.arrow_back), onPressed: _goToDashboard),
       ),
       drawer: _buildDrawer(),
       body: Stack(
         children: [
-          IndexedStack(index: _currentIndex, children: _screens),
+          Positioned.fill(child: Container(color: Colors.white)),
+          _buildScreen(),
           if (_isChatOpen)
             Positioned(
-              right: 16.0,
-              bottom: 85.0,
+              right: 16.0, 
+              bottom: 85.0, 
               child: FoodyAIChatbot(apiService: widget.apiService, onClose: _toggleChat),
             ),
         ],
@@ -127,6 +164,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Drawer _buildDrawer() {
+    if (!_isInitialized) return const Drawer(child: Center(child: Text("Loading...")));
     return Drawer(
       child: Container(
         color: Theme.of(context).cardColor,
@@ -154,7 +192,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ListTile(
               leading: const Icon(Icons.logout, color: Colors.red),
               title: const Text('Logout', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600)),
-              onTap: () => Navigator.pushReplacementNamed(context, '/login'),
+              onTap: () { Navigator.pushReplacementNamed(context, '/login'); },
             ),
           ],
         ),
@@ -177,46 +215,24 @@ class _HomeScreenState extends State<HomeScreen> {
           title: Text(title, style: TextStyle(fontWeight: isSelected ? FontWeight.bold : FontWeight.normal, color: isSelected ? Theme.of(context).colorScheme.primary : Colors.white)),
           selected: isSelected,
           selectedTileColor: Theme.of(context).colorScheme.primary.withOpacity(0.15),
-          onTap: () {
-            Navigator.pop(context);
-            _onNavigate(route, title);
-          },
+          onTap: () { Navigator.pop(context); _onNavigate(route, title); },
         ),
       ),
     );
   }
 }
 
-// --- STUB WIDGETS (Fixes Missing Imports) ---
+// --- MISSING STUB CLASSES TO FIX ERRORS ---
 
-class MainDashboardScreen extends StatelessWidget {
-  final Function(String, String) onNavigate;
-  const MainDashboardScreen({super.key, required this.onNavigate});
+class PlaceholderScreen extends StatelessWidget {
+  final String title;
+  const PlaceholderScreen({super.key, required this.title});
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text("Store Overview", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
-          const SizedBox(height: 16),
-          Container(padding: const EdgeInsets.all(20), color: Colors.white10, child: const Text("Dashboard Statistics Loaded Here", style: TextStyle(color: Colors.white))),
-          const SizedBox(height: 20),
-          ElevatedButton(onPressed: () => onNavigate('/stock-options', 'Stock Entry'), child: const Text("Add Stock")),
-        ],
-      ),
+    return Scaffold(
+      appBar: AppBar(title: Text(title)),
+      body: Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.construction, size: 80, color: Colors.grey[700]), const SizedBox(height: 16), Text("$title\nComing Soon!", textAlign: TextAlign.center, style: const TextStyle(fontSize: 20, color: Colors.grey)), const SizedBox(height: 20), ElevatedButton(onPressed: () => Navigator.pop(context), child: const Text("Go Back"))])),
     );
-  }
-}
-
-class SalesDashboardScreen extends StatelessWidget {
-  final ApiService apiService;
-  final Function(String, String) onNavigate;
-  const SalesDashboardScreen({super.key, required this.apiService, required this.onNavigate});
-  @override
-  Widget build(BuildContext context) {
-    return const Center(child: Text("Sales Analytics Graph (Placeholder)", style: TextStyle(color: Colors.white)));
   }
 }
 
@@ -224,24 +240,7 @@ class DiscountTableScreen extends StatelessWidget {
   const DiscountTableScreen({super.key});
   @override
   Widget build(BuildContext context) {
-    return const Center(child: Text("Discount Table (Placeholder)", style: TextStyle(color: Colors.white)));
-  }
-}
-
-class ForecastScreen extends StatelessWidget {
-  const ForecastScreen({super.key});
-  @override
-  Widget build(BuildContext context) {
-    return const Center(child: Text("Forecast Screen (Placeholder)", style: TextStyle(color: Colors.white)));
-  }
-}
-
-class ProductivityManagementScreen extends StatelessWidget {
-  final ApiService? apiService;
-  const ProductivityManagementScreen({super.key, this.apiService});
-  @override
-  Widget build(BuildContext context) {
-    return const Center(child: Text("Productivity Screen (Placeholder)", style: TextStyle(color: Colors.white)));
+    return const Center(child: Text("Discount Table View (Placeholder)", style: TextStyle(color: Colors.white)));
   }
 }
 
@@ -261,18 +260,6 @@ class FoodyAIChatbot extends StatelessWidget {
           Padding(padding: const EdgeInsets.all(8.0), child: TextField(decoration: InputDecoration(hintText: "Type a message...", filled: true, fillColor: Colors.black, border: OutlineInputBorder(borderRadius: BorderRadius.circular(20))))),
         ],
       ),
-    );
-  }
-}
-
-class PlaceholderScreen extends StatelessWidget {
-  final String title;
-  const PlaceholderScreen({super.key, required this.title});
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.construction, size: 80, color: Colors.grey[700]), const SizedBox(height: 16), Text("$title\nComing Soon!", textAlign: TextAlign.center, style: const TextStyle(fontSize: 20, color: Colors.grey)), const SizedBox(height: 20), ElevatedButton(onPressed: () => Navigator.pop(context), child: const Text("Go Back"))])),
     );
   }
 }
