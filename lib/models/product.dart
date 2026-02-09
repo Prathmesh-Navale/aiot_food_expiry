@@ -79,10 +79,10 @@ class Product {
   factory Product.fromJson(Map<String, dynamic> json) {
     DateTime parsedDate;
     try {
-      parsedDate = DateTime.parse(json['expiry_date'].toString().split('T')[0]);
-    } catch (_) {
-      parsedDate = DateTime.now(); // Fallback date
-    }
+  parsedDate = DateTime.parse(json['expiry_date'].toString().split('T')[0]);
+} catch (_) {
+  parsedDate = DateTime.now(); // Fallback
+}
 
     final idValue = json['_id'];
     final idString = (idValue is Map) ? idValue['\$oid'] as String : idValue as String?;

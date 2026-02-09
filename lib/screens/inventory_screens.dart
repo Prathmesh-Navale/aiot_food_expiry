@@ -447,9 +447,10 @@ class _AlertsDiscountsScreenState extends State<AlertsDiscountsScreen> {
         if (snapshot.hasError) return Center(child: Text('Connection Error: ${snapshot.error}'));
         if (!snapshot.hasData || snapshot.data!.isEmpty) return const Center(child: Text('No inventory items found. Add stock via Stock Entry.'));
 
-        final alertProducts = snapshot.data!
-            .where((p) => p.daysToExpiry > 0 && p.daysToExpiry <= firstAlertDays && p.status != 'Donated')
-            .toList();
+        // Code from your inventory_screens.dart
+final alertProducts = snapshot.data!
+    .where((p) => p.daysToExpiry > 0 && p.daysToExpiry <= 10) // Only shows items expiring in 1-10 days
+    .toList();
 
         return RefreshIndicator(
           onRefresh: () async {

@@ -20,21 +20,36 @@ class ApiService {
 
   ApiService({required this.baseUrl});
 
-  Future<List<Product>> fetchProducts() async {
-    try {
-      final response = await client.get(Uri.parse('$baseUrl/products'));
+  // In lib/services/api_service.dart
 
-      if (response.statusCode == 200) {
-        final List<dynamic> productsJson = jsonDecode(response.body);
-        return productsJson.map((json) => Product.fromJson(json)).toList();
-      } else {
-        throw Exception('Failed to load products: ${response.statusCode}');
-      }
-    } catch (e) {
-      print('API Error (fetchProducts): $e');
+  // In lib/services/api_service.dart
+
+Future<List<Product>> fetchProducts() async {
+  try {
+    print("Attempting to fetch from: $baseUrl/products"); // DEBUG PRINT
+    
+    final response = await client.get(Uri.parse('$baseUrl/products'));
+
+    print("Response Code: ${response.statusCode}"); // DEBUG PRINT
+
+    if (response.statusCode == 200) {
+      final List<dynamic> productsJson = jsonDecode(response.body);
+      print("Data fetched: ${productsJson.length} items found"); // DEBUG PRINT
+      
+      return productsJson.map((json) {
+        // Debugging Date Parsing
+        // print("Parsing item: ${json['product_name']} - Date: ${json['expiry_date']}");
+        return Product.fromJson(json);
+      }).toList();
+    } else {
+      print('Server Error: ${response.body}');
       return [];
     }
+  } catch (e) {
+    print('CRITICAL API ERROR: $e'); // THIS WILL TELL YOU THE PROBLEM
+    return [];
   }
+}
 
   Future<void> addProduct(Product product) async {
     try {
