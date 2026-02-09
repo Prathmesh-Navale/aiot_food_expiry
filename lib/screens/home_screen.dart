@@ -51,12 +51,12 @@ class _HomeScreenState extends State<HomeScreen> {
     ];
 
     _screens = [
-      MainDashboardScreenStub(onNavigate: _onNavigate),
-      SalesDashboardScreenStub(apiService: widget.apiService),
+      MainDashboardScreen(onNavigate: _onNavigate),
+      SalesDashboardScreen(apiService: widget.apiService, onNavigate: _onNavigate),
       StockEntryOptionsScreen(apiService: widget.apiService, refreshHome: _forceRefresh, onProductAdded: dummyOnProductAdded),
       AlertsDiscountsScreen(apiService: widget.apiService, refreshHome: _forceRefresh),
       DonationScreen(apiService: widget.apiService, refreshHome: _forceRefresh),
-      const PlaceholderScreen(title: 'Productivity'), // Placeholder for productivity
+      const ProductivityManagementScreen(), // Placeholder for productivity
       const PlaceholderScreen(title: 'Store Profile'),
       const PlaceholderScreen(title: 'Contact Us'),
       const PlaceholderScreen(title: 'Support Desk'),
@@ -111,7 +111,7 @@ class _HomeScreenState extends State<HomeScreen> {
             Positioned(
               right: 16.0,
               bottom: 85.0,
-              child: ChatbotStub(apiService: widget.apiService, onClose: _toggleChat),
+              child: FoodyAIChatbot(apiService: widget.apiService, onClose: _toggleChat),
             ),
         ],
       ),
@@ -187,11 +187,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-// --- STUB WIDGETS (Placeholders to fix missing imports) ---
+// --- STUB WIDGETS (Fixes Missing Imports) ---
 
-class MainDashboardScreenStub extends StatelessWidget {
+class MainDashboardScreen extends StatelessWidget {
   final Function(String, String) onNavigate;
-  const MainDashboardScreenStub({super.key, required this.onNavigate});
+  const MainDashboardScreen({super.key, required this.onNavigate});
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
@@ -210,19 +210,45 @@ class MainDashboardScreenStub extends StatelessWidget {
   }
 }
 
-class SalesDashboardScreenStub extends StatelessWidget {
+class SalesDashboardScreen extends StatelessWidget {
   final ApiService apiService;
-  const SalesDashboardScreenStub({super.key, required this.apiService});
+  final Function(String, String) onNavigate;
+  const SalesDashboardScreen({super.key, required this.apiService, required this.onNavigate});
   @override
   Widget build(BuildContext context) {
     return const Center(child: Text("Sales Analytics Graph (Placeholder)", style: TextStyle(color: Colors.white)));
   }
 }
 
-class ChatbotStub extends StatelessWidget {
+class DiscountTableScreen extends StatelessWidget {
+  const DiscountTableScreen({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return const Center(child: Text("Discount Table (Placeholder)", style: TextStyle(color: Colors.white)));
+  }
+}
+
+class ForecastScreen extends StatelessWidget {
+  const ForecastScreen({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return const Center(child: Text("Forecast Screen (Placeholder)", style: TextStyle(color: Colors.white)));
+  }
+}
+
+class ProductivityManagementScreen extends StatelessWidget {
+  final ApiService? apiService;
+  const ProductivityManagementScreen({super.key, this.apiService});
+  @override
+  Widget build(BuildContext context) {
+    return const Center(child: Text("Productivity Screen (Placeholder)", style: TextStyle(color: Colors.white)));
+  }
+}
+
+class FoodyAIChatbot extends StatelessWidget {
   final ApiService apiService;
   final VoidCallback onClose;
-  const ChatbotStub({super.key, required this.apiService, required this.onClose});
+  const FoodyAIChatbot({super.key, required this.apiService, required this.onClose});
   @override
   Widget build(BuildContext context) {
     return Container(

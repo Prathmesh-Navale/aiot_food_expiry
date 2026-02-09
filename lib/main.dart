@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'services/api_service.dart';
 import 'screens/home_screen.dart';
-import 'screens/inventory_screens.dart'; // Import for specific route widgets
+import 'screens/inventory_screens.dart'; 
 
 // URL for your Render Backend
 const String BASE_URL = 'https://aiot-food-expiry.onrender.com';
@@ -65,7 +65,7 @@ class AIoTInventoryApp extends StatelessWidget {
       ),
       initialRoute: '/login',
       routes: {
-        '/login': (context) => const LoginScreenStub(),
+        '/login': (context) => const LoginScreen(),
         '/home': (context) {
            return HomeScreen(apiService: apiService, storeName: 'My Store');
         },
@@ -83,8 +83,8 @@ class AIoTInventoryApp extends StatelessWidget {
   }
 }
 
-class LoginScreenStub extends StatelessWidget {
-  const LoginScreenStub({super.key});
+class LoginScreen extends StatelessWidget {
+  const LoginScreen({super.key});
   @override
   Widget build(BuildContext context) {
     return Scaffold(
