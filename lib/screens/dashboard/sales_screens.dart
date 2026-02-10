@@ -1,9 +1,7 @@
 // lib/screens/dashboard/sales_screens.dart
 
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:fl_chart/fl_chart.dart'; 
-import 'package:http/http.dart' as http;
+import 'package:fl_chart/fl_chart.dart';
 import '../../services/api_service.dart';
 
 class SalesDashboardScreen extends StatefulWidget {
@@ -26,9 +24,6 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
   int totalUnits = 0;
   List<Map<String, dynamic>> topProducts = [];
 
-  // CONFIG: Connects to your new MongoDB Aggregation Route
-  final String apiUrl = "http://127.0.0.1:5000/api/sales-stats";
-
   @override
   void initState() {
     super.initState();
@@ -37,19 +32,16 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
 
   Future<void> _fetchSalesData() async {
     try {
-      final response = await http.get(Uri.parse(apiUrl));
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (mounted) {
-          setState(() {
-            totalRevenue = (data['total_revenue'] ?? 0).toDouble();
-            totalUnits = (data['total_units'] ?? 0).toInt();
-            topProducts = List<Map<String, dynamic>>.from(data['top_products'] ?? []);
-            _isLoading = false;
-          });
-        }
-      } else {
-        throw Exception("Failed to load sales data: ${response.statusCode}");
+      // ✅ FIXED: Uses apiService instead of hardcoded URL
+      final data = await widget.apiService.getSalesStats();
+      
+      if (mounted) {
+        setState(() {
+          totalRevenue = (data['total_revenue'] ?? 0).toDouble();
+          totalUnits = (data['total_units'] ?? 0).toInt();
+          topProducts = List<Map<String, dynamic>>.from(data['top_products'] ?? []);
+          _isLoading = false;
+        });
       }
     } catch (e) {
       debugPrint("Error fetching sales data: $e");
@@ -59,16 +51,13 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Professional Dark Theme Colors
     const Color bgDark = Color(0xFF121212);
     const Color cardDark = Color(0xFF1E1E1E);
     const Color accentBlue = Color(0xFF2979FF);
 
     return Scaffold(
       backgroundColor: bgDark,
-      // Custom Dark App Bar
       appBar: AppBar(
-         
         backgroundColor: Colors.transparent,
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
@@ -89,7 +78,6 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 1. SUMMARY CARDS ROW
                   Row(
                     children: [
                       Expanded(
@@ -97,7 +85,7 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
                           "Total Revenue",
                           "\$${totalRevenue.toStringAsFixed(0)}",
                           Icons.attach_money,
-                          const [Color(0xFF00C853), Color(0xFF69F0AE)], // Green Gradient
+                          const [Color(0xFF00C853), Color(0xFF69F0AE)],
                         ),
                       ),
                       const SizedBox(width: 16),
@@ -106,21 +94,17 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
                           "Units Sold",
                           "$totalUnits",
                           Icons.shopping_bag,
-                          const [Color(0xFF2979FF), Color(0xFF82B1FF)], // Blue Gradient
+                          const [Color(0xFF2979FF), Color(0xFF82B1FF)],
                         ),
                       ),
                     ],
                   ),
-                  
                   const SizedBox(height: 30),
-                  
-                  // 2. CHART SECTION
                   const Text(
                     "Top Performing Products",
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white70),
                   ),
                   const SizedBox(height: 16),
-
                   Container(
                     height: 320,
                     padding: const EdgeInsets.fromLTRB(16, 24, 16, 10),
@@ -135,11 +119,10 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
                         : BarChart(
                             BarChartData(
                               alignment: BarChartAlignment.spaceAround,
-                              maxY: (topProducts.first['value'] as int).toDouble() * 1.2, // Dynamic Max Y
+                              maxY: (topProducts.first['value'] as int).toDouble() * 1.2,
                               barTouchData: BarTouchData(
                                 enabled: true,
                                 touchTooltipData: BarTouchTooltipData(
-                                  // --- FIX: Using tooltipBgColor for v0.66.2 ---
                                   tooltipBgColor: Colors.blueGrey.shade900,
                                   getTooltipItem: (group, groupIndex, rod, rodIndex) {
                                     String productName = topProducts[group.x.toInt()]['name'];
@@ -164,7 +147,6 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
                                     reservedSize: 40,
                                     getTitlesWidget: (value, meta) {
                                       if (value.toInt() >= 0 && value.toInt() < topProducts.length) {
-                                        // Show first letter of product name as label
                                         return Padding(
                                           padding: const EdgeInsets.only(top: 8.0),
                                           child: Text(
@@ -192,14 +174,6 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
                                       color: accentBlue,
                                       width: 22,
                                       borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
-                                      // Note: backDrawRodData might also need adjustment if 0.66.2 differs, 
-                                      // but usually rodStackItems is the complex part. 
-                                      // Simpler background rod logic:
-                                      backDrawRodData: BackgroundBarChartRodData(
-                                        show: true,
-                                        toY: (topProducts.first['value'] as int).toDouble() * 1.2,
-                                        color: Colors.white.withOpacity(0.05),
-                                      ),
                                     ),
                                   ],
                                 );
@@ -207,25 +181,19 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
                             ),
                           ),
                   ),
-
                   const SizedBox(height: 30),
-
-                  // 3. DETAILED LIST
                   const Text(
                     "Performance Breakdown",
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white70),
                   ),
                   const SizedBox(height: 12),
                   ...topProducts.map((product) => _buildListTile(product, cardDark)),
-                  
-                  const SizedBox(height: 50), // Bottom Padding
+                  const SizedBox(height: 50),
                 ],
               ),
             ),
     );
   }
-
-  // --- HELPER WIDGETS ---
 
   Widget _buildSummaryCard(String title, String value, IconData icon, List<Color> gradient) {
     return Container(

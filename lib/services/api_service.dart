@@ -1,4 +1,4 @@
-//api_service.dart
+// lib/services/api_service.dart
 
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -18,43 +18,32 @@ class ApiService {
   final String baseUrl;
   final http.Client client = http.Client();
 
+  // ✅ FIXED: Constructor now correctly receives URL from main.dart
   ApiService({required this.baseUrl});
 
-  // In lib/services/api_service.dart
+  // --- CORE PRODUCT ENDPOINTS ---
 
-  // In lib/services/api_service.dart
+  Future<List<Product>> fetchProducts() async {
+    try {
+      final response = await client.get(Uri.parse('$baseUrl/api/products'));
 
-Future<List<Product>> fetchProducts() async {
-  try {
-    print("Attempting to fetch from: $baseUrl/products"); // DEBUG PRINT
-    
-    final response = await client.get(Uri.parse('$baseUrl/products'));
-
-    print("Response Code: ${response.statusCode}"); // DEBUG PRINT
-
-    if (response.statusCode == 200) {
-      final List<dynamic> productsJson = jsonDecode(response.body);
-      print("Data fetched: ${productsJson.length} items found"); // DEBUG PRINT
-      
-      return productsJson.map((json) {
-        // Debugging Date Parsing
-        // print("Parsing item: ${json['product_name']} - Date: ${json['expiry_date']}");
-        return Product.fromJson(json);
-      }).toList();
-    } else {
-      print('Server Error: ${response.body}');
+      if (response.statusCode == 200) {
+        final List<dynamic> productsJson = jsonDecode(response.body);
+        return productsJson.map((json) => Product.fromJson(json)).toList();
+      } else {
+        print('Server Error ${response.statusCode}: ${response.body}');
+        return [];
+      }
+    } catch (e) {
+      print('API Error (fetchProducts): $e');
       return [];
     }
-  } catch (e) {
-    print('CRITICAL API ERROR: $e'); // THIS WILL TELL YOU THE PROBLEM
-    return [];
   }
-}
 
   Future<void> addProduct(Product product) async {
     try {
       final response = await client.post(
-        Uri.parse('$baseUrl/products'),
+        Uri.parse('$baseUrl/api/products'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(product.toJson()),
       );
@@ -70,8 +59,7 @@ Future<List<Product>> fetchProducts() async {
 
   Future<void> deleteProduct(String id) async {
     try {
-      final response = await client.delete(Uri.parse('$baseUrl/products/$id'));
-
+      final response = await client.delete(Uri.parse('$baseUrl/api/products/$id'));
       if (response.statusCode != 200) {
         throw Exception('Failed to delete product: ${response.body}');
       }
@@ -81,19 +69,63 @@ Future<List<Product>> fetchProducts() async {
     }
   }
 
-  // --- UPDATED: sales_last_10d explicitly set to 0.0 ---
+  // --- DASHBOARD & ANALYTICS ENDPOINTS ---
+
+  Future<Map<String, dynamic>> getSalesStats() async {
+    try {
+      // ✅ Uses the dynamic baseUrl instead of localhost
+      final response = await client.get(Uri.parse('$baseUrl/api/sales-stats'));
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+      return {};
+    } catch (e) {
+      print("API Error (getSalesStats): $e");
+      return {};
+    }
+  }
+
+  Future<List<dynamic>> getForecast() async {
+    try {
+      // ✅ Uses the dynamic baseUrl instead of localhost
+      final response = await client.get(Uri.parse('$baseUrl/api/forecast'));
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+      return [];
+    } catch (e) {
+      print("API Error (getForecast): $e");
+      return [];
+    }
+  }
+
+  Future<List<dynamic>> getDiscountsRaw() async {
+    try {
+      // ✅ Uses the dynamic baseUrl instead of localhost
+      final response = await client.get(Uri.parse('$baseUrl/api/discounts'));
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+      return [];
+    } catch (e) {
+      print("API Error (getDiscounts): $e");
+      return [];
+    }
+  }
+
+  // --- AI FEATURES ---
+
   Future<Map<String, double>> calculateDiscount(Product product) async {
     try {
-      // Required 7 features for the backend's XGBoost model
       final response = await client.post(
-        Uri.parse('$baseUrl/calculate_discount'),
+        Uri.parse('$baseUrl/api/calculate_discount'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'sku_encoded': product.skuEncoded,
-          'current_stock': product.quantity, // quantity acts as current_stock
+          'current_stock': product.quantity,
           'days_until_expiry': product.daysToExpiry,
-          'sales_last_10d': 0.0, // Explicitly set to 0 for new stock entry calculation
-          'avg_temp': product.avgTemp, // Backend uses avg_temp_c
+          'sales_last_10d': 0.0,
+          'avg_temp': product.avgTemp,
           'is_holiday': product.isHoliday,
           'full_retail_price': product.initialPrice,
         }),
@@ -101,29 +133,29 @@ Future<List<Product>> fetchProducts() async {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-
-        // Handle "donate" action returned by the model
-        if (data['action'] == 'donate') {
-          throw Exception('AI Recommended Donation: ${data['message']}');
-        }
-
         return {
           'discount_percentage': (data['discount_percentage'] as num?)?.toDouble() ?? 0.0,
           'final_price': (data['final_price'] as num?)?.toDouble() ?? product.initialPrice,
         };
       } else {
-        throw Exception('Failed to calculate discount: ${response.body}');
+        return {
+          'discount_percentage': 0.0,
+          'final_price': product.initialPrice,
+        };
       }
     } catch (e) {
       print('API Error (calculateDiscount): $e');
-      rethrow;
+      return {
+        'discount_percentage': 0.0,
+        'final_price': product.initialPrice,
+      };
     }
   }
 
   Future<String> getRecipeSuggestion(String productName) async {
     try {
       final response = await client.post(
-        Uri.parse('$baseUrl/ai_recipe'),
+        Uri.parse('$baseUrl/api/ai_recipe'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'product_name': productName}),
       );
@@ -139,56 +171,29 @@ Future<List<Product>> fetchProducts() async {
     }
   }
 
-  // --- Chatbot Query Resolver (Uses existing APIs) ---
+  // --- MOCK / LOCAL HELPERS ---
+
   Future<String> resolveChatQuery(String query) async {
     final lowerQuery = query.toLowerCase();
-
-    if (lowerQuery.contains('total stock') || lowerQuery.contains('total inventory')) {
+    if (lowerQuery.contains('total stock')) {
       final products = await fetchProducts();
       final totalQuantity = products.fold(0, (sum, p) => sum + p.quantity);
-      return 'Your current total inventory across all products is **$totalQuantity units**.';
+      return 'Total inventory: **$totalQuantity units**.';
     }
-
-    if (lowerQuery.contains('sales details')) {
-      return 'For detailed sales trends, please visit the **Sales Visualization** tab.';
-    }
-
-    if (lowerQuery.contains('donation') || lowerQuery.contains('donate')) {
-      final products = await fetchProducts();
-      final donationCandidates = products.where((p) => p.daysToExpiry <= 4 && p.status != 'Donated').toList();
-      if (donationCandidates.isEmpty) {
-        return 'Great news! You currently have **no items** requiring immediate donation or disposal (under 4 days to expiry).';
-      } else {
-        final totalQty = donationCandidates.fold(0, (sum, p) => sum + p.quantity);
-        return 'Alert: You have **$totalQty units** of ${donationCandidates.length} product types expiring soon. Please review the **Donation Management** screen.';
-      }
-    }
-
-    if (lowerQuery.contains('products list') || lowerQuery.contains('all items')) {
-      return 'To see the full product list and edit details, please visit the **Discounts & Alerts** screen to view the product table.';
-    }
-
-    // Fallback/Generic AI response
-    return "I am Foody-AI. I specialize in inventory, sales, and expiry data. Try asking: 'How many units need donation?' or 'Where are my sales details?'";
+    return "I am Foody-AI. Ask me about stock, sales, or expiry.";
   }
 
   Future<List<SalesDataPoint>> fetchProductSalesDetail(String productName) async {
-    await Future.delayed(const Duration(milliseconds: 500)); // Simulate network delay
-
+    await Future.delayed(const Duration(milliseconds: 500));
     final today = DateTime.now();
     final random = Random(productName.hashCode);
     final List<SalesDataPoint> data = [];
-
-    // Simulate 30 days of data
     for (int i = 29; i >= 0; i--) {
       final date = today.subtract(Duration(days: i));
-      // Random quantity based on product name hash for consistent simulation
       final quantity = 10 + random.nextInt(40);
-      final revenue = quantity * (10 + random.nextDouble() * 5); // Base price $10-$15
-
+      final revenue = quantity * (10 + random.nextDouble() * 5);
       data.add(SalesDataPoint(date: date, quantity: quantity, revenue: revenue));
     }
-
     return data;
   }
 }
