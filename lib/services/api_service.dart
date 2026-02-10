@@ -5,12 +5,10 @@ import 'dart:convert';
 import '../models/product.dart';
 import 'dart:math';
 
-// Define the data model required for sales simulation
 class SalesDataPoint {
   final DateTime date;
   final int quantity;
   final double revenue;
-
   SalesDataPoint({required this.date, required this.quantity, required this.revenue});
 }
 
@@ -18,20 +16,18 @@ class ApiService {
   final String baseUrl;
   final http.Client client = http.Client();
 
-  // ✅ FIXED: Constructor now correctly receives URL from main.dart
-  ApiService({required this.baseUrl});
+  // ✅ Constructor receives the URL from main.dart
+  ApiService({required this.baseUrl}); 
 
-  // --- CORE PRODUCT ENDPOINTS ---
-
+  // --- CORE PRODUCTS ---
   Future<List<Product>> fetchProducts() async {
     try {
       final response = await client.get(Uri.parse('$baseUrl/api/products'));
-
       if (response.statusCode == 200) {
         final List<dynamic> productsJson = jsonDecode(response.body);
         return productsJson.map((json) => Product.fromJson(json)).toList();
       } else {
-        print('Server Error ${response.statusCode}: ${response.body}');
+        print('Server Error: ${response.statusCode}');
         return [];
       }
     } catch (e) {
@@ -41,80 +37,18 @@ class ApiService {
   }
 
   Future<void> addProduct(Product product) async {
-    try {
-      final response = await client.post(
-        Uri.parse('$baseUrl/api/products'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(product.toJson()),
-      );
-
-      if (response.statusCode != 201) {
-        throw Exception('Failed to add product: ${response.body}');
-      }
-    } catch (e) {
-      print('API Error (addProduct): $e');
-      rethrow;
-    }
+    await client.post(
+      Uri.parse('$baseUrl/api/products'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(product.toJson()),
+    );
   }
 
   Future<void> deleteProduct(String id) async {
-    try {
-      final response = await client.delete(Uri.parse('$baseUrl/api/products/$id'));
-      if (response.statusCode != 200) {
-        throw Exception('Failed to delete product: ${response.body}');
-      }
-    } catch (e) {
-      print('API Error (deleteProduct): $e');
-      rethrow;
-    }
+    await client.delete(Uri.parse('$baseUrl/api/products/$id'));
   }
 
-  // --- DASHBOARD & ANALYTICS ENDPOINTS ---
-
-  Future<Map<String, dynamic>> getSalesStats() async {
-    try {
-      // ✅ Uses the dynamic baseUrl instead of localhost
-      final response = await client.get(Uri.parse('$baseUrl/api/sales-stats'));
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
-      }
-      return {};
-    } catch (e) {
-      print("API Error (getSalesStats): $e");
-      return {};
-    }
-  }
-
-  Future<List<dynamic>> getForecast() async {
-    try {
-      // ✅ Uses the dynamic baseUrl instead of localhost
-      final response = await client.get(Uri.parse('$baseUrl/api/forecast'));
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
-      }
-      return [];
-    } catch (e) {
-      print("API Error (getForecast): $e");
-      return [];
-    }
-  }
-
-  Future<List<dynamic>> getDiscountsRaw() async {
-    try {
-      // ✅ Uses the dynamic baseUrl instead of localhost
-      final response = await client.get(Uri.parse('$baseUrl/api/discounts'));
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
-      }
-      return [];
-    } catch (e) {
-      print("API Error (getDiscounts): $e");
-      return [];
-    }
-  }
-
-  // --- AI FEATURES ---
-
+  // --- AI & LOGIC ---
   Future<Map<String, double>> calculateDiscount(Product product) async {
     try {
       final response = await client.post(
@@ -137,18 +71,11 @@ class ApiService {
           'discount_percentage': (data['discount_percentage'] as num?)?.toDouble() ?? 0.0,
           'final_price': (data['final_price'] as num?)?.toDouble() ?? product.initialPrice,
         };
-      } else {
-        return {
-          'discount_percentage': 0.0,
-          'final_price': product.initialPrice,
-        };
       }
+      return {'discount_percentage': 0.0, 'final_price': product.initialPrice};
     } catch (e) {
       print('API Error (calculateDiscount): $e');
-      return {
-        'discount_percentage': 0.0,
-        'final_price': product.initialPrice,
-      };
+      return {'discount_percentage': 0.0, 'final_price': product.initialPrice};
     }
   }
 
@@ -159,41 +86,37 @@ class ApiService {
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'product_name': productName}),
       );
-
       if (response.statusCode == 200) {
-        return jsonDecode(response.body)['recipe'] as String? ?? 'No recipe found.';
-      } else {
-        return 'Recipe generation failed.';
+        return jsonDecode(response.body)['recipe'] ?? 'No recipe found.';
       }
+      return 'Recipe generation failed.';
     } catch (e) {
-      print('API Error (getRecipeSuggestion): $e');
       return 'Recipe service unavailable.';
     }
   }
 
-  // --- MOCK / LOCAL HELPERS ---
-
-  Future<String> resolveChatQuery(String query) async {
-    final lowerQuery = query.toLowerCase();
-    if (lowerQuery.contains('total stock')) {
-      final products = await fetchProducts();
-      final totalQuantity = products.fold(0, (sum, p) => sum + p.quantity);
-      return 'Total inventory: **$totalQuantity units**.';
-    }
-    return "I am Foody-AI. Ask me about stock, sales, or expiry.";
+  // --- DATA FETCHERS FOR DASHBOARDS ---
+  Future<Map<String, dynamic>> getSalesStats() async {
+    try {
+      final response = await client.get(Uri.parse('$baseUrl/api/sales-stats'));
+      if (response.statusCode == 200) return jsonDecode(response.body);
+      return {};
+    } catch (e) { return {}; }
   }
 
-  Future<List<SalesDataPoint>> fetchProductSalesDetail(String productName) async {
-    await Future.delayed(const Duration(milliseconds: 500));
-    final today = DateTime.now();
-    final random = Random(productName.hashCode);
-    final List<SalesDataPoint> data = [];
-    for (int i = 29; i >= 0; i--) {
-      final date = today.subtract(Duration(days: i));
-      final quantity = 10 + random.nextInt(40);
-      final revenue = quantity * (10 + random.nextDouble() * 5);
-      data.add(SalesDataPoint(date: date, quantity: quantity, revenue: revenue));
-    }
-    return data;
+  Future<List<dynamic>> getForecast() async {
+    try {
+      final response = await client.get(Uri.parse('$baseUrl/api/forecast'));
+      if (response.statusCode == 200) return jsonDecode(response.body);
+      return [];
+    } catch (e) { return []; }
+  }
+
+  Future<List<dynamic>> getDiscountsRaw() async {
+    try {
+      final response = await client.get(Uri.parse('$baseUrl/api/discounts'));
+      if (response.statusCode == 200) return jsonDecode(response.body);
+      return [];
+    } catch (e) { return []; }
   }
 }
