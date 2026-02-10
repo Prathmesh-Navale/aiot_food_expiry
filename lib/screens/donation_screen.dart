@@ -2,32 +2,7 @@
 
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
-
-class DonationItem {
-  final String productName;
-  final int currentStock;
-  final double markedPrice;
-  final int remainingLife;
-  final String actionStatus;
-
-  DonationItem({
-    required this.productName,
-    required this.currentStock,
-    required this.markedPrice,
-    required this.remainingLife,
-    required this.actionStatus,
-  });
-
-  factory DonationItem.fromJson(Map<String, dynamic> json) {
-    return DonationItem(
-      productName: json['product_name'] ?? json['Product_Name'] ?? 'Unknown',
-      currentStock: json['current_stock'] ?? json['Stock_Quantity'] ?? 0,
-      markedPrice: (json['marked_price'] ?? 0).toDouble(),
-      remainingLife: (json['remaining_life'] ?? json['Days_Until_Expiry'] ?? 0).toInt(),
-      actionStatus: json['action_status'] ?? json['Action_Status'] ?? 'Keep Price',
-    );
-  }
-}
+import '../models/product.dart';
 
 class DonationScreen extends StatefulWidget {
   final ApiService apiService;
@@ -44,7 +19,7 @@ class DonationScreen extends StatefulWidget {
 }
 
 class _DonationScreenState extends State<DonationScreen> {
-  List<DonationItem> _donationList = [];
+  List<Product> _donationList = [];
   bool _isLoading = true;
   String? _selectedNGO; 
   
@@ -62,25 +37,47 @@ class _DonationScreenState extends State<DonationScreen> {
   Future<void> _fetchDonations() async {
     setState(() => _isLoading = true);
     try {
-      // ✅ FIXED: Uses apiService instead of hardcoded URL
-      final body = await widget.apiService.getDiscountsRaw();
-      
-      // FILTER: Keep ONLY items marked "DONATE"
-      List<DonationItem> allItems = body
-          .map((item) => DonationItem.fromJson(item))
-          .where((item) => item.actionStatus == "DONATE") 
-          .toList();
+      // 1. Fetch All Products
+      final allProducts = await widget.apiService.fetchProducts();
+      List<Product> candidates = [];
 
+      for (var p in allProducts) {
+        bool shouldDonate = false;
+
+        // Condition 1: Expiry <= 4 days
+        if (p.daysToExpiry <= 4 && p.status != 'Donated') {
+          shouldDonate = true;
+        } 
+        // Condition 2: High Discount (> 70%) means item is dead stock
+        else if (p.daysToExpiry <= 30 && p.status != 'Donated') { 
+           // Only check discount for items expiring reasonably soon (e.g. 30 days) to save calls
+           try {
+             final result = await widget.apiService.calculateDiscount(p);
+             double discount = result['discount_percentage'] ?? 0.0;
+             if (discount > 70.0) {
+               shouldDonate = true;
+             }
+           } catch (e) {
+             // Ignore error, don't donate if calculation fails
+           }
+        }
+
+        if (shouldDonate) {
+          candidates.add(p);
+        }
+      }
+
+      // Calculate Totals
       double tempValue = 0;
       int tempStock = 0;
-      for (var item in allItems) {
-        tempValue += (item.currentStock * item.markedPrice);
-        tempStock += item.currentStock;
+      for (var item in candidates) {
+        tempValue += (item.quantity * item.initialPrice);
+        tempStock += item.quantity;
       }
 
       if (mounted) {
         setState(() {
-          _donationList = allItems;
+          _donationList = candidates;
           totalValue = tempValue;
           totalMeals = tempStock; 
           _isLoading = false;
@@ -106,8 +103,15 @@ class _DonationScreenState extends State<DonationScreen> {
       builder: (ctx) => const Center(child: CircularProgressIndicator(color: Colors.white)),
     );
 
-    Future.delayed(const Duration(seconds: 2), () {
+    Future.delayed(const Duration(seconds: 2), () async {
+      // Mark all as donated in backend
+      for (var p in _donationList) {
+         if (p.id != null) await widget.apiService.deleteProduct(p.id!);
+      }
+
+      if (!context.mounted) return;
       Navigator.pop(context); // Close loader
+      
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -218,17 +222,17 @@ class _DonationScreenState extends State<DonationScreen> {
     );
   }
 
-  Widget _buildDonationCard(DonationItem item) {
+  Widget _buildDonationCard(Product item) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey.shade200)),
       child: Row(
         children: [
-          Container(width: 56, height: 56, decoration: BoxDecoration(color: const Color(0xFFFFEBEE), borderRadius: BorderRadius.circular(12)), child: Center(child: Text(item.productName[0], style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFFD32F2F))))),
+          Container(width: 56, height: 56, decoration: BoxDecoration(color: const Color(0xFFFFEBEE), borderRadius: BorderRadius.circular(12)), child: Center(child: Text(item.productName.isNotEmpty ? item.productName[0] : '?', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFFD32F2F))))),
           const SizedBox(width: 16),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(item.productName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87)), const SizedBox(height: 6), Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3), decoration: BoxDecoration(color: const Color(0xFFFFF3E0), borderRadius: BorderRadius.circular(6)), child: Row(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.access_time_filled, size: 12, color: Colors.deepOrange), const SizedBox(width: 4), Text("Expires in ${item.remainingLife} days", style: const TextStyle(color: Colors.deepOrange, fontSize: 11, fontWeight: FontWeight.bold))]))])),
-          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [Text("${item.currentStock} Units", style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: Color(0xFF263238))), const SizedBox(height: 4), Text("Value: \$${(item.markedPrice * item.currentStock).toStringAsFixed(0)}", style: TextStyle(color: Colors.grey.shade500, fontSize: 12, fontWeight: FontWeight.w500))]),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(item.productName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87)), const SizedBox(height: 6), Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3), decoration: BoxDecoration(color: const Color(0xFFFFF3E0), borderRadius: BorderRadius.circular(6)), child: Row(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.access_time_filled, size: 12, color: Colors.deepOrange), const SizedBox(width: 4), Text("Expires in ${item.daysToExpiry} days", style: const TextStyle(color: Colors.deepOrange, fontSize: 11, fontWeight: FontWeight.bold))]))])),
+          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [Text("${item.quantity} Units", style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: Color(0xFF263238))), const SizedBox(height: 4), Text("Value: \$${(item.initialPrice * item.quantity).toStringAsFixed(0)}", style: TextStyle(color: Colors.grey.shade500, fontSize: 12, fontWeight: FontWeight.w500))]),
         ],
       ),
     );
