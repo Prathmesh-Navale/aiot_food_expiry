@@ -1,5 +1,3 @@
-// lib/services/api_service.dart
-
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../models/product.dart';
@@ -16,10 +14,10 @@ class ApiService {
   final String baseUrl;
   final http.Client client = http.Client();
 
-  // ✅ Constructor receives the URL from main.dart
-  ApiService({required this.baseUrl}); 
+  ApiService({required this.baseUrl});
 
-  // --- CORE PRODUCTS ---
+  // --- CORE ENDPOINTS ---
+
   Future<List<Product>> fetchProducts() async {
     try {
       final response = await client.get(Uri.parse('$baseUrl/api/products'));
@@ -37,18 +35,35 @@ class ApiService {
   }
 
   Future<void> addProduct(Product product) async {
-    await client.post(
-      Uri.parse('$baseUrl/api/products'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(product.toJson()),
-    );
+    try {
+      final response = await client.post(
+        Uri.parse('$baseUrl/api/products'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(product.toJson()),
+      );
+      if (response.statusCode != 201) {
+        throw Exception('Failed to add product: ${response.body}');
+      }
+    } catch (e) {
+      print('API Error (addProduct): $e');
+      rethrow;
+    }
   }
 
   Future<void> deleteProduct(String id) async {
-    await client.delete(Uri.parse('$baseUrl/api/products/$id'));
+    try {
+      final response = await client.delete(Uri.parse('$baseUrl/api/products/$id'));
+      if (response.statusCode != 200) {
+        throw Exception('Failed to delete product: ${response.body}');
+      }
+    } catch (e) {
+      print('API Error (deleteProduct): $e');
+      rethrow;
+    }
   }
 
-  // --- AI & LOGIC ---
+  // --- AI & DISCOUNT LOGIC ---
+
   Future<Map<String, double>> calculateDiscount(Product product) async {
     try {
       final response = await client.post(
@@ -95,7 +110,8 @@ class ApiService {
     }
   }
 
-  // --- DATA FETCHERS FOR DASHBOARDS ---
+  // --- DASHBOARD DATA FETCHERS (Fixes "localhost" issues) ---
+
   Future<Map<String, dynamic>> getSalesStats() async {
     try {
       final response = await client.get(Uri.parse('$baseUrl/api/sales-stats'));
@@ -118,5 +134,10 @@ class ApiService {
       if (response.statusCode == 200) return jsonDecode(response.body);
       return [];
     } catch (e) { return []; }
+  }
+
+  // --- HELPERS ---
+  Future<String> resolveChatQuery(String query) async {
+    return "I am Foody-AI. Ask me about stock, sales, or expiry.";
   }
 }

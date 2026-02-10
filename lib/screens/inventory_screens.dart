@@ -1,10 +1,9 @@
-// lib/screens/inventory_screens.dart
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../services/api_service.dart';
 import '../models/product.dart';
+import 'barcode_scanner_screen.dart'; // Ensure this file exists
 
 // --- UTILITY WIDGETS ---
 class OptionButton extends StatelessWidget {
@@ -226,19 +225,17 @@ class _AlertsDiscountsScreenState extends State<AlertsDiscountsScreen> {
           final result = await widget.apiService.calculateDiscount(product);
           double discount = result['discount_percentage'] ?? 0.0;
           
-          // ✅ LOGIC FIX: If discount > 70%, DO NOT add to this list (it goes to Donation)
+          // ✅ LOGIC FIX: If discount > 70%, it goes to Donation, NOT Discount list.
           if (discount > 70.0) {
-             continue; // Skip this item
+             continue; // Skip adding to this screen
           }
 
-          // Otherwise, it stays in the Discount screen
           processedProducts.add(product.copyProductWith(
             discountPercentage: discount,
             finalPrice: result['final_price'] ?? product.initialPrice,
             status: 'Discount Active',
           ));
         } catch (e) {
-          // If calc fails, just add normally
           processedProducts.add(product);
         }
       } 
@@ -325,40 +322,6 @@ class _DiscountAlertCardState extends State<DiscountAlertCard> {
               title: const Text('Real-Time Interface Preview', style: TextStyle(fontWeight: FontWeight.w600)),
               children: [Padding(padding: const EdgeInsets.all(8.0), child: Text(_recipeSuggestion, style: Theme.of(context).textTheme.bodyMedium))],
             ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// --- BARCODE SCANNER ---
-class BarcodeScannerScreen extends StatelessWidget {
-  final Function(Map<String, dynamic>) onScanCompleted;
-  const BarcodeScannerScreen({super.key, required this.onScanCompleted});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(title: const Text('Simulate Scanner')),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.qr_code_scanner, size: 100, color: Colors.green),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () => onScanCompleted({
-                'productName': 'Scanned Soda',
-                'productSku': 'SODA-123',
-                'initialPrice': 2.50,
-                'quantity': 10,
-                'expiryDays': 60,
-                'storageLocation': 'Fridge B'
-              }),
-              child: const Text("Capture 'Soda'"),
-            )
           ],
         ),
       ),
