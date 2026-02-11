@@ -1,3 +1,5 @@
+// lib/services/api_service.dart
+
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../models/product.dart';
@@ -16,8 +18,7 @@ class ApiService {
 
   ApiService({required this.baseUrl});
 
-  // --- CORE ENDPOINTS ---
-
+  // --- 1. CORE PRODUCT FETCHING ---
   Future<List<Product>> fetchProducts() async {
     try {
       final response = await client.get(Uri.parse('$baseUrl/api/products'));
@@ -25,45 +26,57 @@ class ApiService {
         final List<dynamic> productsJson = jsonDecode(response.body);
         return productsJson.map((json) => Product.fromJson(json)).toList();
       } else {
-        print('Server Error: ${response.statusCode}');
+        print('Backend Error: ${response.statusCode}');
         return [];
       }
     } catch (e) {
-      print('API Error (fetchProducts): $e');
+      print('Connection Error (fetchProducts): $e');
       return [];
     }
   }
 
   Future<void> addProduct(Product product) async {
-    try {
-      final response = await client.post(
-        Uri.parse('$baseUrl/api/products'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(product.toJson()),
-      );
-      if (response.statusCode != 201) {
-        throw Exception('Failed to add product: ${response.body}');
-      }
-    } catch (e) {
-      print('API Error (addProduct): $e');
-      rethrow;
-    }
+    await client.post(
+      Uri.parse('$baseUrl/api/products'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(product.toJson()),
+    );
   }
 
   Future<void> deleteProduct(String id) async {
-    try {
-      final response = await client.delete(Uri.parse('$baseUrl/api/products/$id'));
-      if (response.statusCode != 200) {
-        throw Exception('Failed to delete product: ${response.body}');
-      }
-    } catch (e) {
-      print('API Error (deleteProduct): $e');
-      rethrow;
-    }
+    await client.delete(Uri.parse('$baseUrl/api/products/$id'));
   }
 
-  // --- AI & DISCOUNT LOGIC ---
+  // --- 2. DASHBOARD DATA FETCHERS (Replaces Hardcoded URLs) ---
+  
+  // For Sales Screen
+  Future<Map<String, dynamic>> getSalesStats() async {
+    try {
+      final response = await client.get(Uri.parse('$baseUrl/api/sales-stats'));
+      if (response.statusCode == 200) return jsonDecode(response.body);
+      return {};
+    } catch (e) { return {}; }
+  }
 
+  // For Forecast Screen
+  Future<List<dynamic>> getForecast() async {
+    try {
+      final response = await client.get(Uri.parse('$baseUrl/api/forecast'));
+      if (response.statusCode == 200) return jsonDecode(response.body);
+      return [];
+    } catch (e) { return []; }
+  }
+
+  // For Donation & Discount Screens
+  Future<List<dynamic>> getDiscountsRaw() async {
+    try {
+      final response = await client.get(Uri.parse('$baseUrl/api/discounts'));
+      if (response.statusCode == 200) return jsonDecode(response.body);
+      return [];
+    } catch (e) { return []; }
+  }
+
+  // --- 3. AI & LOGIC ---
   Future<Map<String, double>> calculateDiscount(Product product) async {
     try {
       final response = await client.post(
@@ -89,7 +102,6 @@ class ApiService {
       }
       return {'discount_percentage': 0.0, 'final_price': product.initialPrice};
     } catch (e) {
-      print('API Error (calculateDiscount): $e');
       return {'discount_percentage': 0.0, 'final_price': product.initialPrice};
     }
   }
@@ -108,36 +120,5 @@ class ApiService {
     } catch (e) {
       return 'Recipe service unavailable.';
     }
-  }
-
-  // --- DASHBOARD DATA FETCHERS (Fixes "localhost" issues) ---
-
-  Future<Map<String, dynamic>> getSalesStats() async {
-    try {
-      final response = await client.get(Uri.parse('$baseUrl/api/sales-stats'));
-      if (response.statusCode == 200) return jsonDecode(response.body);
-      return {};
-    } catch (e) { return {}; }
-  }
-
-  Future<List<dynamic>> getForecast() async {
-    try {
-      final response = await client.get(Uri.parse('$baseUrl/api/forecast'));
-      if (response.statusCode == 200) return jsonDecode(response.body);
-      return [];
-    } catch (e) { return []; }
-  }
-
-  Future<List<dynamic>> getDiscountsRaw() async {
-    try {
-      final response = await client.get(Uri.parse('$baseUrl/api/discounts'));
-      if (response.statusCode == 200) return jsonDecode(response.body);
-      return [];
-    } catch (e) { return []; }
-  }
-
-  // --- HELPERS ---
-  Future<String> resolveChatQuery(String query) async {
-    return "I am Foody-AI. Ask me about stock, sales, or expiry.";
   }
 }

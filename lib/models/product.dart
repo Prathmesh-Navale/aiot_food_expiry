@@ -67,10 +67,7 @@ class Product {
   factory Product.fromJson(Map<String, dynamic> json) {
     DateTime parsedDate;
     try {
-      // Handle various date formats from Python
-      String dateStr = json['expiry_date'].toString();
-      if (dateStr.length > 10) dateStr = dateStr.substring(0, 10); 
-      parsedDate = DateTime.parse(dateStr);
+      parsedDate = DateTime.parse(json['expiry_date'].toString().split('T')[0]);
     } catch (_) {
       parsedDate = DateTime.now();
     }
@@ -87,24 +84,16 @@ class Product {
 
     return Product(
       id: idString,
-      // Handle "product_name" OR "Product_Name"
       productName: json['product_name'] ?? json['Product_Name'] ?? 'Unknown',
-      
-      // ✅ FIXED: Look for 'marked_price' if 'initial_price' is missing
+      // Handles both "initial_price" and "marked_price" from Atlas
       initialPrice: getValue<double>(json['initial_price'] ?? json['marked_price'], 0.0),
-      
-      // ✅ FIXED: Look for 'current_stock' if 'quantity' is missing
+      // Handles both "quantity" and "current_stock" from Atlas
       quantity: getValue<int>(json['quantity'] ?? json['current_stock'], 0),
-      
       expiryDate: parsedDate,
-      storageLocation: json['storage_location'] ?? 'Shelf A',
-      
-      // Handle Discounts
+      storageLocation: json['storage_location'] ?? 'Shelf',
       discountPercentage: getValue<double>(json['discount_percentage'] ?? json['final_discount_pct'], 0.0),
       finalPrice: getValue<double>(json['final_price'] ?? json['final_selling_price'], 0.0),
-      
       status: json['status'] ?? json['action_status'] ?? 'For Sale',
-
       productSku: json['sku'] ?? '',
       skuEncoded: getValue<int>(json['sku_encoded'], 1),
       avgTemp: getValue<double>(json['avg_temp'], 20.0),
