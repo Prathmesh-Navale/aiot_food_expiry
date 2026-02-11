@@ -1,7 +1,6 @@
-//product.dart
+// lib/models/product.dart
 import 'dart:math';
 
-// --- CORE DATA MODEL ---
 class Product {
   final String? id;
   final String productName;
@@ -12,18 +11,10 @@ class Product {
   final double discountPercentage;
   final double finalPrice;
   final String status;
-
-  // --- NEW FIELDS ---
-  final String productSku; // The human-readable SKU/Barcode
-  // ------------------
-
-  // --- AI MODEL FEATURES ---
-  final int skuEncoded; // Required for AI model input
-  // Removed: salesLast10d
-  final double avgTemp; // Required for AI model input (Simulated on frontend)
-  final int isHoliday; // Required for AI model input (Simulated on frontend)
-  // Note: initialPrice acts as full_retail_price
-  // -----------------------------
+  final String productSku;
+  final int skuEncoded;
+  final double avgTemp;
+  final int isHoliday;
 
   Product({
     this.id,
@@ -35,15 +26,12 @@ class Product {
     this.discountPercentage = 0.0,
     this.finalPrice = 0.0,
     this.status = 'For Sale',
-
-    // Default/Simulated values for new fields
     this.productSku = '',
     this.skuEncoded = 1,
     this.avgTemp = 20.0,
     this.isHoliday = 0,
   });
 
-  // Method to create a new Product instance with updated fields
   Product copyProductWith({
     String? id,
     String? productName,
@@ -79,10 +67,13 @@ class Product {
   factory Product.fromJson(Map<String, dynamic> json) {
     DateTime parsedDate;
     try {
-  parsedDate = DateTime.parse(json['expiry_date'].toString().split('T')[0]);
-} catch (_) {
-  parsedDate = DateTime.now(); // Fallback
-}
+      // Handle various date formats from Python
+      String dateStr = json['expiry_date'].toString();
+      if (dateStr.length > 10) dateStr = dateStr.substring(0, 10); 
+      parsedDate = DateTime.parse(dateStr);
+    } catch (_) {
+      parsedDate = DateTime.now();
+    }
 
     final idValue = json['_id'];
     final idString = (idValue is Map) ? idValue['\$oid'] as String : idValue as String?;
@@ -96,14 +87,23 @@ class Product {
 
     return Product(
       id: idString,
-      productName: json['product_name'] ?? 'Unknown',
-      initialPrice: getValue<double>(json['initial_price'], 0.0),
-      quantity: getValue<int>(json['quantity'], 0),
+      // Handle "product_name" OR "Product_Name"
+      productName: json['product_name'] ?? json['Product_Name'] ?? 'Unknown',
+      
+      // ✅ FIXED: Look for 'marked_price' if 'initial_price' is missing
+      initialPrice: getValue<double>(json['initial_price'] ?? json['marked_price'], 0.0),
+      
+      // ✅ FIXED: Look for 'current_stock' if 'quantity' is missing
+      quantity: getValue<int>(json['quantity'] ?? json['current_stock'], 0),
+      
       expiryDate: parsedDate,
-      storageLocation: json['storage_location'] ?? 'Shelf',
-      discountPercentage: getValue<double>(json['discount_percentage'], 0.0),
-      finalPrice: getValue<double>(json['final_price'], 0.0),
-      status: json['status'] ?? 'For Sale',
+      storageLocation: json['storage_location'] ?? 'Shelf A',
+      
+      // Handle Discounts
+      discountPercentage: getValue<double>(json['discount_percentage'] ?? json['final_discount_pct'], 0.0),
+      finalPrice: getValue<double>(json['final_price'] ?? json['final_selling_price'], 0.0),
+      
+      status: json['status'] ?? json['action_status'] ?? 'For Sale',
 
       productSku: json['sku'] ?? '',
       skuEncoded: getValue<int>(json['sku_encoded'], 1),
@@ -122,7 +122,6 @@ class Product {
       'discount_percentage': discountPercentage,
       'final_price': finalPrice,
       'status': status,
-
       'sku': productSku,
       'sku_encoded': skuEncoded,
       'avg_temp': avgTemp,
